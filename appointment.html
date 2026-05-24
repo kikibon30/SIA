@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Appointment Module - Appointment & Treatment System</title>
+    <!-- SUPABASE LIBRARY -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f0f4f8; }
+        
+        /* NAVBAR */
+        .navbar { background: #0f3b5c; padding: 0; box-shadow: 0 2px 10px rgba(0,0,0,0.1); position: sticky; top: 0; z-index: 100; }
+        .navbar-content { max-width: 1400px; margin: 0 auto; display: flex; align-items: center; padding: 16px 24px; }
+        .logo { font-size: 1.8rem; font-weight: 700; color: white; margin-right: 40px; }
+        .nav-menu { display: flex; gap: 0; flex: 1; }
+        .nav-item { 
+            color: white; 
+            padding: 16px 20px; 
+            cursor: pointer; 
+            text-decoration: none;
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s ease;
+            font-weight: 500;
+        }
+        .nav-item:hover { background: rgba(255,255,255,0.1); border-bottom-color: #4db8ff; }
+        .nav-item.active { background: rgba(255,255,255,0.2); border-bottom-color: #4db8ff; }
+        
+        /* MAIN CONTENT */
+        .container { max-width: 1400px; margin: 0 auto; padding: 24px; }
+        h1 { color: #0f3b5c; margin-bottom: 8px; font-size: 2rem; }
+        .sub { color: #5a6e7c; margin-bottom: 24px; font-size: 0.95rem; }
+        
+        /* CARDS */
+        .card { background: white; border-radius: 16px; border: 1px solid #e2e8f0; overflow: hidden; margin-bottom: 24px; }
+        .card-header { background: #f8fafc; padding: 16px 20px; border-bottom: 1px solid #e2e8f0; font-weight: 700; font-size: 1.1rem; color: #1e4a6e; }
+        .card-body { padding: 20px; }
+        .form-group { margin-bottom: 16px; }
+        label { display: block; font-weight: 600; font-size: 0.85rem; margin-bottom: 6px; color: #2c5a7a; }
+        input, select, textarea { width: 100%; padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 10px; font-size: 0.9rem; }
+        input:focus, select:focus, textarea:focus { outline: none; border-color: #2c7da0; background-color: #f0f8ff; }
+        button { background: #2c7da0; color: white; border: none; padding: 10px 20px; border-radius: 30px; font-weight: 600; cursor: pointer; transition: 0.3s; }
+        button:hover { background: #1f5e7e; }
+        .btn-outline { background: white; border: 1px solid #cbd5e1; color: #2c7da0; }
+        .btn-danger { background: #dc2626; }
+        .btn-danger:hover { background: #b91c1c; }
+        
+        /* TABLE */
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 10px; text-align: left; border-bottom: 1px solid #e2e8f0; font-size: 0.85rem; }
+        th { background: #f8fafc; font-weight: 600; color: #1e4a6e; }
+        tr:hover { background: #f9f9f9; }
+        
+        .empty-state { text-align: center; padding: 40px; color: #94a3b8; }
+        hr { margin: 16px 0; }
+        
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+        @media (max-width: 1000px) { .grid-2 { grid-template-columns: 1fr; } }
+        
+        .stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-bottom: 24px; }
+        .stat-box { background: white; padding: 20px; border-radius: 12px; border-left: 4px solid #2c7da0; text-align: center; }
+        .stat-number { font-size: 2rem; font-weight: 700; color: #0f3b5c; }
+        .stat-label { color: #5a6e7c; font-size: 0.9rem; margin-top: 8px; }
+        
+        .status-badge { display: inline-block; padding: 4px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: 600; }
+        .status-scheduled { background: #dbeafe; color: #1e40af; }
+        .status-completed { background: #dcfce7; color: #15803d; }
+        .status-cancelled { background: #fee2e2; color: #b91c1c; }
+        .status-pending { background: #fef3c7; color: #92400e; }
+    </style>
+    <!-- CONFIG & DB HELPER -->
+    <script src="supabase-config.js"></script>
+    <script src="db-helper.js"></script>
+</head>
+<body>
+
+<!-- NAVBAR -->
+<nav class="navbar">
+    <div class="navbar-content">
+        <div class="logo">🏥 Appointment & Treatment System</div>
+        <div class="nav-menu">
+            <a href="index.html" class="nav-item" onclick="setActive(event)">📊 Dashboard</a>
+            <a href="appointment.html" class="nav-item active" onclick="setActive(event)">📅 Appointments</a>
+            <a href="treatment.html" class="nav-item" onclick="setActive(event)">💊 Treatment</a>
+        </div>
+    </div>
+</nav>
+
+<div class="container">
+    <h1>📅 Appointment Module</h1>
+    <div class="sub">Schedule and manage patient appointments with doctors</div>
+    
+    <!-- STATISTICS -->
+    <div class="stats">
+        <div class="stat-box">
+            <div class="stat-number" id="totalAppointments">0</div>
+            <div class="stat-label">Total Appointments</div>
+        </div>
+        <div class="stat-box">
+            <div class="stat-number" id="upcomingAppointments">0</div>
+            <div class="stat-label">Upcoming Appointments</div>
+        </div>
+    </div>
+
+    <!-- SCHEDULE APPOINTMENTS -->
+    <div class="card">
+        <div class="card-header">
+            📅 Schedule Patient Appointments with Doctors
+        </div>
+        <div class="card-body">
+            <form id="appointmentForm">
+                <input type="hidden" id="appointmentId">
+                <div class="grid-2">
+                    <div>
+                        <div class="form-group">
+                            <label>Select Patient</label>
+                            <select id="patientSelect" required>
+                                <option value="">-- Select Existing Patient --</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Patient ID (Auto-populated)</label>
+                            <input type="text" id="patientId" placeholder="e.g., P001" readonly>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="form-group">
+                            <label>Select Doctor</label>
+                            <select id="doctorSelect" required>
+                                <option value="">-- Select Doctor --</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Doctor Contact</label>
+                            <input type="text" id="doctorContact" placeholder="Doctor contact info" readonly>
+                        </div>
+                    </div>
+                </div>
+                <div class="grid-2">
+                    <div class="form-group">
+                        <label>Appointment Date</label>
+                        <input type="date" id="appointmentDate" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Appointment Time</label>
+                        <input type="time" id="appointmentTime" required>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Appointment Type</label>
+                    <select id="appointmentType">
+                        <option value="Consultation">Consultation</option>
+                        <option value="Follow-up">Follow-up</option>
+                        <option value="Checkup">Checkup</option>
+                        <option value="Surgery">Surgery</option>
+                        <option value="Emergency">Emergency</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Reason for Appointment</label>
+                    <textarea id="appointmentReason" rows="3" placeholder="Describe the reason for appointment..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Status</label>
+                    <select id="appointmentStatus">
+                        <option value="Scheduled">Scheduled</option>
+                        <option value="Pending">Pending</option>
+                        <option value="Completed">Completed</option>
+                        <option value="Cancelled">Cancelled</option>
+                    </select>
+                </div>
+                <div style="display: flex; gap: 10px;">
+                    <button type="submit">💾 Save Appointment</button>
+                    <button type="button" class="btn-outline" onclick="clearAppointmentForm()">Clear</button>
+                </div>
+            </form>
+            <hr>
+            <h3 style="margin-bottom: 15px; color: #0f3b5c;">📋 Appointments List</h3>
+            <table id="appointmentsTable">
+                <thead>
+                    <tr>
+                        <th>Patient Name</th>
+                        <th>Doctor</th>
+                        <th>Date & Time</th>
+                        <th>Type</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="appointmentsList">
+                    <tr class="empty-state"><td colspan="6">No appointments scheduled yet</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+function setActive(event) {
+    document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
+    event.target.classList.add('active');
+}
+
+let db;
+const appointmentsList = [];
+let doctors = [];
+let patients = [];
+
+async function initializeModule() {
+    try {
+        if (!window.supabaseClient) {
+            console.log('Using localStorage only');
+            loadDoctorsFromStorage();
+            loadAppointmentsFromStorage();
+            return;
+        }
+        
+        db = new AppointmentDB(window.supabaseClient);
+        await loadDoctors();
+        await loadPatients();
+        await loadAppointments();
+    } catch (error) {
+        console.error('Initialization error:', error);
+        loadAppointmentsFromStorage();
+    }
+}
+
+async function loadDoctors() {
+    try {
+        if (!db) return;
+        doctors = await db.getDoctors();
+        populateDoctorSelect();
+    } catch (error) {
+        console.error('Error loading doctors:', error);
+        loadDoctorsFromStorage();
+    }
+}
+
+async function loadPatients() {
+    try {
+        if (!db) {
+            console.log('No DB connection, skipping patient load');
+            return;
+        }
+        console.log('Loading patients from database...');
+        patients = await db.getPatients();
+        console.log('Patients loaded:', patients);
+        populatePatientSelect();
+    } catch (error) {
+        console.error('Error loading patients:', error);
+        loadPatientsFromStorage();
+    }
+}
+
+function populatePatientSelect() {
+    const select = document.getElementById('patientSelect');
+    select.innerHTML = '<option value="">-- Select Existing Patient --</option>';
+    
+    console.log('Populating patient select with:', patients);
+    
+    if (!patients || patients.length === 0) {
+        console.warn('No patients available to display');
+        const option = new Option('No patients available', '');
+        select.appendChild(option);
+        return;
+    }
+    
+    patients.forEach(patient => {
+        const option = new Option(patient.name, patient.id);
+        select.appendChild(option);
+    });
+    
+    // Only add listener once
+    select.onchange = (e) => {
+        const selected = patients.find(p => p.id == e.target.value);
+        document.getElementById('patientId').value = selected ? selected.id : '';
+    };
+}
+
+function loadPatientsFromStorage() {
+    patients = [];
+    const savedAppointments = JSON.parse(localStorage.getItem('appointments') || '[]');
+    const patientMap = new Map();
+    
+    savedAppointments.forEach(apt => {
+        if (apt.patient_name && !patientMap.has(apt.patient_name)) {
+            patientMap.set(apt.patient_name, {
+                id: apt.patient_id,
+                name: apt.patient_name
+            });
+        }
+    });
+    
+    patients = Array.from(patientMap.values());
+    populatePatientSelect();
+}
+
+function loadDoctorsFromStorage() {
+    doctors = [
+        { id: 1, name: 'Dr. Sarah Chen', contact: 'sarah.chen@hospital.com' },
+        { id: 2, name: 'Dr. Michael Johnson', contact: 'michael.j@hospital.com' },
+        { id: 3, name: 'Dr. Emily Roberts', contact: 'emily.r@hospital.com' }
+    ];
+    populateDoctorSelect();
+}
+
+function populateDoctorSelect() {
+    const select = document.getElementById('doctorSelect');
+    select.innerHTML = '<option value="">-- Select Doctor --</option>';
+    
+    doctors.forEach(doctor => {
+        const option = new Option(doctor.name, doctor.id);
+        select.appendChild(option);
+    });
+    
+    select.addEventListener('change', (e) => {
+        const selected = doctors.find(d => d.id == e.target.value);
+        document.getElementById('doctorContact').value = selected ? selected.contact : '';
+    });
+}
+
+document.getElementById('appointmentForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const patientSelect = document.getElementById('patientSelect');
+    const selectedPatientName = patientSelect.options[patientSelect.selectedIndex].text;
+    
+    const appointment = {
+        id: document.getElementById('appointmentId').value || Date.now().toString(),
+        patient_name: selectedPatientName,
+        patient_id: document.getElementById('patientId').value,
+        doctor_id: document.getElementById('doctorSelect').value,
+        doctor_name: document.getElementById('doctorSelect').options[document.getElementById('doctorSelect').selectedIndex].text,
+        date: document.getElementById('appointmentDate').value,
+        time: document.getElementById('appointmentTime').value,
+        type: document.getElementById('appointmentType').value,
+        reason: document.getElementById('appointmentReason').value,
+        status: document.getElementById('appointmentStatus').value,
+        created_at: new Date().toISOString()
+    };
+    
+    try {
+        if (db) {
+            const existingId = document.getElementById('appointmentId').value;
+            if (existingId) {
+                await db.updateAppointment(existingId, appointment);
+            } else {
+                await db.addAppointment(appointment);
+            }
+        }
+        
+        const existingIndex = appointmentsList.findIndex(a => a.id === appointment.id);
+        if (existingIndex > -1) {
+            appointmentsList[existingIndex] = appointment;
+        } else {
+            appointmentsList.push(appointment);
+        }
+        
+        localStorage.setItem('appointments', JSON.stringify(appointmentsList));
+        displayAppointments();
+        clearAppointmentForm();
+        updateStats();
+        showNotification('Appointment saved successfully!');
+    } catch (error) {
+        console.error('Error saving appointment:', error);
+        showNotification('Error saving appointment', true);
+    }
+});
+
+function displayAppointments() {
+    const tbody = document.getElementById('appointmentsList');
+    tbody.innerHTML = '';
+    
+    if (appointmentsList.length === 0) {
+        tbody.innerHTML = '<tr class="empty-state"><td colspan="6">No appointments scheduled yet</td></tr>';
+        return;
+    }
+    
+    appointmentsList.forEach(apt => {
+        const row = tbody.insertRow();
+        const dateTime = new Date(apt.date + 'T' + apt.time).toLocaleString();
+        row.innerHTML = `
+            <td>${apt.patient_name}</td>
+            <td>${apt.doctor_name}</td>
+            <td>${dateTime}</td>
+            <td>${apt.type}</td>
+            <td><span class="status-badge status-${apt.status.toLowerCase()}">${apt.status}</span></td>
+            <td>
+                <button onclick="editAppointment('${apt.id}')" class="btn-outline" style="padding: 5px 10px; font-size: 0.8rem;">Edit</button>
+                <button onclick="deleteAppointment('${apt.id}')" class="btn-danger" style="padding: 5px 10px; font-size: 0.8rem;">Delete</button>
+            </td>
+        `;
+    });
+}
+
+function clearAppointmentForm() {
+    document.getElementById('appointmentForm').reset();
+    document.getElementById('appointmentId').value = '';
+    document.getElementById('doctorContact').value = '';
+    document.getElementById('patientId').value = '';
+}
+
+function editAppointment(id) {
+    const apt = appointmentsList.find(a => a.id === id);
+    if (apt) {
+        document.getElementById('appointmentId').value = apt.id;
+        document.getElementById('patientSelect').value = apt.patient_id;
+        document.getElementById('patientId').value = apt.patient_id;
+        document.getElementById('doctorSelect').value = apt.doctor_id;
+        document.getElementById('appointmentDate').value = apt.date;
+        document.getElementById('appointmentTime').value = apt.time;
+        document.getElementById('appointmentType').value = apt.type;
+        document.getElementById('appointmentReason').value = apt.reason;
+        document.getElementById('appointmentStatus').value = apt.status;
+        window.scrollTo(0, document.getElementById('appointmentForm').offsetTop);
+    }
+}
+
+async function deleteAppointment(id) {
+    if (confirm('Are you sure you want to delete this appointment?')) {
+        try {
+            if (db) {
+                await db.deleteAppointment(id);
+            }
+            
+            const index = appointmentsList.findIndex(a => a.id === id);
+            if (index > -1) {
+                appointmentsList.splice(index, 1);
+                localStorage.setItem('appointments', JSON.stringify(appointmentsList));
+                displayAppointments();
+                updateStats();
+                showNotification('Appointment deleted');
+            }
+        } catch (error) {
+            console.error('Error deleting appointment:', error);
+            showNotification('Error deleting appointment', true);
+        }
+    }
+}
+
+function updateStats() {
+    document.getElementById('totalAppointments').textContent = appointmentsList.length;
+    
+    const upcoming = appointmentsList.filter(a => {
+        const aptDate = new Date(a.date);
+        return aptDate >= new Date() && a.status === 'Scheduled';
+    }).length;
+    document.getElementById('upcomingAppointments').textContent = upcoming;
+}
+
+async function loadAppointments() {
+    try {
+        if (db) {
+            const data = await db.getAppointments();
+            appointmentsList.push(...data);
+        } else {
+            loadAppointmentsFromStorage();
+        }
+        displayAppointments();
+        updateStats();
+    } catch (error) {
+        console.error('Error loading appointments:', error);
+        loadAppointmentsFromStorage();
+    }
+}
+
+function loadAppointmentsFromStorage() {
+    const saved = localStorage.getItem('appointments');
+    if (saved) {
+        appointmentsList.push(...JSON.parse(saved));
+    }
+}
+
+function showNotification(message, isError = false) {
+    const notification = document.createElement('div');
+    notification.textContent = message;
+    notification.style.cssText = `position: fixed; top: 20px; right: 20px; background: ${isError ? '#dc2626' : '#059669'}; color: white; padding: 12px 20px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); z-index: 1000;`;
+    document.body.appendChild(notification);
+    setTimeout(() => notification.remove(), 3000);
+}
+
+window.addEventListener('load', initializeModule);
+</script>
+
+</body>
+</html>
