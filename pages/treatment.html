@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Treatments — MedCenter SIA</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <link rel="stylesheet" href="/assets/css/style.css">
+
+</head>
+<body>
+
+<div class="app-shell">
+
+  <!-- SIDEBAR - no icons, plain text only -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-logo">HC</div>
+      <div class="sidebar-brand">
+        <div class="sidebar-brand-name">MedCenter SIA</div>
+        <div class="sidebar-brand-sub">Appointment System</div>
+      </div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">Main</div>
+      <a href="/index.html" class="nav-item">
+        <span class="nav-label">Dashboard</span>
+      </a>
+      <a href="/pages/appointment.html" class="nav-item">
+        <span class="nav-label">Appointments</span>
+      </a>
+      <a href="/pages/treatment.html" class="nav-item">
+        <span class="nav-label">Treatments</span>
+      </a>
+      <a href="/pages/patient.html" class="nav-item">
+        <span class="nav-label">Patients</span>
+      </a>
+      <div class="nav-section-label">System</div>
+      <a href="#" class="nav-item">
+        <span class="nav-label">Settings</span>
+      </a>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="db-status" id="dbStatus">
+        <span class="db-status-dot"></span>
+        <span class="db-status-text">Connected</span>
+      </div>
+      <div class="user-card">
+        <div class="user-avatar">AD</div>
+        <div class="user-info">
+          <div class="user-name">Admin User</div>
+          <div class="user-role">System Administrator</div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN CONTENT -->
+  <div class="main-content">
+
+    <header class="topbar">
+      <div class="topbar-left">
+        <div>
+          <div class="page-title">Treatments</div>
+          <div class="page-breadcrumb">Record and track patient treatments</div>
+        </div>
+      </div>
+      <div class="topbar-right">
+        <div class="topbar-search">
+          <span>🔍</span>
+          <input type="text" id="globalSearch" placeholder="Search by patient name..." />
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="openNewForm()">New Treatment</button>
+        <button class="topbar-btn" id="exportBtn" title="Export CSV">⬇</button>
+      </div>
+    </header>
+
+    <main class="page-content">
+
+      <!-- Stats - no icons -->
+      <div class="stats-grid" style="grid-template-columns:repeat(4,1fr);">
+        <div class="stat-card">
+          <div class="stat-value" id="sTotalTrt">—</div>
+          <div class="stat-label">Total Treatments</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="sOngoing">—</div>
+          <div class="stat-label">Ongoing</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="sCompleted">—</div>
+          <div class="stat-label">Completed</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="sPending">—</div>
+          <div class="stat-label">Pending</div>
+        </div>
+      </div>
+
+      <!-- Split layout -->
+      <div class="split-layout">
+
+        <!-- FORM PANEL -->
+        <div class="split-panel" id="formPanel">
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title" id="formTitle">New Treatment</span>
+              <button class="btn btn-ghost btn-sm" onclick="clearForm()">Clear</button>
+            </div>
+            <div class="card-body">
+              <form id="treatmentForm" novalidate>
+                <input type="hidden" id="trtId" />
+                <div class="form-grid">
+
+                  <div class="form-group">
+                    <label>Patient <span class="required">*</span></label>
+                    <select class="form-control" id="patientSelect" required>
+                      <option value="">— Select Patient —</option>
+                    </select>
+                    <div class="form-error">Required</div>
+                  </div>
+
+                  <div class="form-group">
+                    <label>Patient ID</label>
+                    <input class="form-control" id="patientId" type="text" readonly placeholder="Auto-filled" />
+                  </div>
+
+                  <div class="form-group">
+                    <label>Diagnosis <span class="required">*</span></label>
+                    <input class="form-control" id="trtDiagnosis" type="text" required placeholder="e.g. Hypertension, Diabetes" />
+                    <div class="form-error">Required</div>
+                  </div>
+
+                  <div class="form-group">
+                    <label>Treatment Type</label>
+                    <select class="form-control" id="trtType">
+                      <option value="Medication">Medication</option>
+                      <option value="Surgery">Surgery</option>
+                      <option value="Therapy">Therapy</option>
+                      <option value="Rehabilitation">Rehabilitation</option>
+                      <option value="Observation">Observation</option>
+                      <option value="Procedure">Procedure</option>
+                      <option value="Lab Test">Lab Test</option>
+                    </select>
+                  </div>
+
+                  <div class="form-group">
+                    <label>Treatment Description</label>
+                    <textarea class="form-control" id="trtDesc" rows="2" placeholder="Treatment details..."></textarea>
+                  </div>
+
+                  <div class="form-group">
+                    <label>Procedure Notes</label>
+                    <textarea class="form-control" id="trtProcedure" rows="2" placeholder="Procedure or medication notes..."></textarea>
+                  </div>
+
+                  <div class="divider"></div>
+
+                  <div style="font-size:0.7rem;font-weight:700;color:#64748b;text-transform:uppercase;margin-bottom:4px;">Staff Assignment</div>
+
+                  <div class="form-group">
+                    <label>Attending Doctor</label>
+                    <select class="form-control" id="trtDoctor">
+                      <option value="">— Select Doctor —</option>
+                    </select>
+                  </div>
+
+                  <div class="form-group">
+                    <label>Assigned Nurse(s)</label>
+                    <select class="form-control" id="trtNurse" multiple style="height:80px;">
+                    </select>
+                    <div class="form-hint">Hold Ctrl to select multiple</div>
+                  </div>
+
+                  <div class="divider"></div>
+
+                  <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+                    <div class="form-group">
+                      <label>Date <span class="required">*</span></label>
+                      <input class="form-control" id="trtDate" type="date" required />
+                      <div class="form-error">Required</div>
+                    </div>
+                    <div class="form-group">
+                      <label>Status</label>
+                      <select class="form-control" id="trtStatus">
+                        <option value="Pending">Pending</option>
+                        <option value="Ongoing">Ongoing</option>
+                        <option value="Completed">Completed</option>
+                        <option value="On Hold">On Hold</option>
+                        <option value="Cancelled">Cancelled</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <button type="submit" class="btn btn-primary w-full" id="submitBtn">
+                    Save Treatment
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+
+        <!-- TABLE PANEL -->
+        <div>
+          <div class="card">
+            <div class="filter-bar">
+              <div class="filter-group">
+                <select class="form-control" id="filterStatus" style="min-width:140px;">
+                  <option value="">All Statuses</option>
+                  <option value="Pending">Pending</option>
+                  <option value="Ongoing">Ongoing</option>
+                  <option value="Completed">Completed</option>
+                  <option value="On Hold">On Hold</option>
+                  <option value="Cancelled">Cancelled</option>
+                </select>
+                <select class="form-control" id="filterType" style="min-width:140px;">
+                  <option value="">All Types</option>
+                  <option value="Medication">Medication</option>
+                  <option value="Surgery">Surgery</option>
+                  <option value="Therapy">Therapy</option>
+                  <option value="Rehabilitation">Rehabilitation</option>
+                  <option value="Observation">Observation</option>
+                  <option value="Procedure">Procedure</option>
+                  <option value="Lab Test">Lab Test</option>
+                </select>
+              </div>
+              <div class="filter-actions">
+                <button class="btn btn-secondary btn-sm" onclick="clearFilters()">Clear</button>
+              </div>
+            </div>
+
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Patient</th>
+                    <th>Diagnosis</th>
+                    <th>Type</th>
+                    <th>Doctor</th>
+                    <th>Nurse(s)</th>
+                    <th>Date</th>
+                    <th>Status</th>
+                    <th style="text-align:right;">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="trtTableBody">
+                  <tr>
+                    <td colspan="8">
+                      <div class="empty-state">Loading treatments...</div>
+                     </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div style="padding:12px 24px;border-top:1px solid #eef2ff;display:flex;justify-content:space-between;">
+              <span class="text-muted" id="tableCount"></span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </main>
+  </div>
+</div>
+
+<div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+<script>
+  // MOCK DATABASE (localStorage)
+  const STORAGE_KEYS = { treatments: 'med_treatments', patients: 'med_patients', doctors: 'med_doctors', nurses: 'med_nurses' };
+  
+  function initMockData() {
+    if (!localStorage.getItem(STORAGE_KEYS.patients)) {
+      localStorage.setItem(STORAGE_KEYS.patients, JSON.stringify([
+        { id: 'p1', name: 'Emma Johnson', patient_id: 'P001' },
+        { id: 'p2', name: 'Michael Chen', patient_id: 'P002' },
+        { id: 'p3', name: 'Sophia Lee', patient_id: 'P003' },
+        { id: 'p4', name: 'James Brown', patient_id: 'P004' }
+      ]));
+    }
+    if (!localStorage.getItem(STORAGE_KEYS.doctors)) {
+      localStorage.setItem(STORAGE_KEYS.doctors, JSON.stringify([
+        { id: 'd1', name: 'Dr. Smith' },
+        { id: 'd2', name: 'Dr. Adams' },
+        { id: 'd3', name: 'Dr. Williams' }
+      ]));
+    }
+    if (!localStorage.getItem(STORAGE_KEYS.nurses)) {
+      localStorage.setItem(STORAGE_KEYS.nurses, JSON.stringify([
+        { id: 'n1', name: 'Nurse Anna' },
+        { id: 'n2', name: 'Nurse Brian' },
+        { id: 'n3', name: 'Nurse Claire' }
+      ]));
+    }
+    if (!localStorage.getItem(STORAGE_KEYS.treatments)) {
+      const today = new Date().toISOString().split('T')[0];
+      localStorage.setItem(STORAGE_KEYS.treatments, JSON.stringify([
+        { id: 't1', patient_name: 'Emma Johnson', patient_id: 'p1', diagnosis: 'Hypertension', type: 'Medication', description: 'Prescribed Lisinopril', procedure: '', doctor_id: 'd1', doctor_name: 'Dr. Smith', nurses: ['n1'], date: today, status: 'Completed' },
+        { id: 't2', patient_name: 'Michael Chen', patient_id: 'p2', diagnosis: 'Sprain', type: 'Therapy', description: 'Physical therapy session', procedure: '', doctor_id: 'd2', doctor_name: 'Dr. Adams', nurses: ['n2'], date: today, status: 'Ongoing' },
+        { id: 't3', patient_name: 'Sophia Lee', patient_id: 'p3', diagnosis: 'Allergy', type: 'Medication', description: 'Antihistamines', procedure: '', doctor_id: 'd3', doctor_name: 'Dr. Williams', nurses: ['n1','n3'], date: new Date(Date.now() - 86400000).toISOString().split('T')[0], status: 'Completed' }
+      ]));
+    }
+  }
+  initMockData();
+
+  function getPatients() { return JSON.parse(localStorage.getItem(STORAGE_KEYS.patients) || '[]'); }
+  function getDoctors() { return JSON.parse(localStorage.getItem(STORAGE_KEYS.doctors) || '[]'); }
+  function getNurses() { return JSON.parse(localStorage.getItem(STORAGE_KEYS.nurses) || '[]'); }
+  function getTreatments() { return JSON.parse(localStorage.getItem(STORAGE_KEYS.treatments) || '[]'); }
+  function saveTreatments(data) { localStorage.setItem(STORAGE_KEYS.treatments, JSON.stringify(data)); }
+
+  const Format = {
+    date: (d) => d ? new Date(d).toLocaleDateString() : '—',
+    initials: (name) => name ? name.split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase() : '??',
+    statusBadge: (status) => {
+      const map = { Pending:'Pending', Ongoing:'Ongoing', Completed:'Completed', 'On Hold':'On Hold', Cancelled:'Cancelled' };
+      let cls = 'badge ';
+      if (status === 'Completed') cls += 'badge-completed';
+      else if (status === 'Ongoing') cls += 'badge-scheduled';
+      else if (status === 'Pending') cls += 'badge-pending';
+      else cls += 'badge-cancelled';
+      return `<span class="${cls}">${map[status] || status}</span>`;
+    }
+  };
+
+  let allTreatments = [];
+  let doctors = [], nurses = [], patients = [];
+  let editingId = null;
+
+  function loadDoctors() {
+    doctors = getDoctors();
+    const sel = document.getElementById('trtDoctor');
+    sel.innerHTML = '<option value="">— Select Doctor —</option>';
+    doctors.forEach(d => { sel.insertAdjacentHTML('beforeend', `<option value="${d.id}">${d.name}</option>`); });
+  }
+
+  function loadNurses() {
+    nurses = getNurses();
+    const sel = document.getElementById('trtNurse');
+    sel.innerHTML = '';
+    nurses.forEach(n => { sel.insertAdjacentHTML('beforeend', `<option value="${n.id}">${n.name}</option>`); });
+  }
+
+  function loadPatients() {
+    patients = getPatients();
+    const sel = document.getElementById('patientSelect');
+    sel.innerHTML = '<option value="">— Select Patient —</option>';
+    patients.forEach(p => { sel.insertAdjacentHTML('beforeend', `<option value="${p.id}" data-pid="${p.patient_id}">${p.name}</option>`); });
+  }
+
+  function loadTreatments() {
+    allTreatments = getTreatments();
+    renderTable(applyFilters(allTreatments));
+    updateStats(allTreatments);
+  }
+
+  function applyFilters(data) {
+    const status = document.getElementById('filterStatus').value;
+    const type = document.getElementById('filterType').value;
+    const search = document.getElementById('globalSearch').value.toLowerCase();
+    return data.filter(t => {
+      if (status && t.status !== status) return false;
+      if (type && t.type !== type) return false;
+      if (search && !t.patient_name?.toLowerCase().includes(search) && !t.diagnosis?.toLowerCase().includes(search)) return false;
+      return true;
+    });
+  }
+
+  function renderTable(data) {
+    const tbody = document.getElementById('trtTableBody');
+    document.getElementById('tableCount').textContent = `${data.length} record${data.length !== 1 ? 's' : ''}`;
+    if (!data.length) {
+      tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state">No treatments found</div></td></tr>`;
+      return;
+    }
+    tbody.innerHTML = data.map(t => {
+      const nurseNames = Array.isArray(t.nurses) ? t.nurses.map(id => nurses.find(n => n.id === id)?.name || id).join(', ') : (t.nurses || '—');
+      return `
+        <tr>
+          <td>
+            <div class="table-name-cell">
+              <div class="table-avatar">${Format.initials(t.patient_name)}</div>
+              <div>
+                <div class="table-name-primary">${t.patient_name}</div>
+                <div class="table-name-secondary">${t.patient_id || '—'}</div>
+              </div>
+            </div>
+          </td>
+          <td>
+            <div class="table-name-primary">${t.diagnosis || '—'}</div>
+            <div class="table-name-secondary text-muted">${(t.description || '').slice(0,40)}${t.description?.length > 40 ? '…' : ''}</div>
+          </td>
+          <td><span class="badge badge-active">${t.type || '—'}</span></td>
+          <td>${t.doctor_name || '—'}</td>
+          <td><span class="text-sm text-muted">${nurseNames || '—'}</span></td>
+          <td>${Format.date(t.date)}</td>
+          <td>${Format.statusBadge(t.status)}</td>
+          <td><div class="table-actions"><button class="btn btn-secondary btn-sm btn-icon" onclick="editTreatment('${t.id}')">Edit</button><button class="btn btn-danger btn-sm btn-icon" onclick="deleteTreatment('${t.id}')">Delete</button></div></td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  function updateStats(data) {
+    document.getElementById('sTotalTrt').textContent = data.length;
+    document.getElementById('sOngoing').textContent = data.filter(t => t.status === 'Ongoing').length;
+    document.getElementById('sCompleted').textContent = data.filter(t => t.status === 'Completed').length;
+    document.getElementById('sPending').textContent = data.filter(t => t.status === 'Pending').length;
+  }
+
+  function openNewForm() {
+    editingId = null;
+    document.getElementById('formTitle').textContent = 'New Treatment';
+    document.getElementById('submitBtn').innerHTML = 'Save Treatment';
+    clearForm();
+    document.getElementById('formPanel').scrollIntoView({ behavior: 'smooth' });
+  }
+
+  function validateForm() {
+    let valid = true;
+    const reqFields = ['patientSelect', 'trtDiagnosis', 'trtDate'];
+    reqFields.forEach(field => {
+      const el = document.getElementById(field);
+      const group = el.closest('.form-group');
+      if (!el.value) {
+        group?.classList.add('error');
+        valid = false;
+      } else {
+        group?.classList.remove('error');
+      }
+    });
+    return valid;
+  }
+
+  function clearValidation() {
+    document.querySelectorAll('.form-group').forEach(g => g.classList.remove('error'));
+  }
+
+  document.getElementById('treatmentForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    clearValidation();
+    if (!validateForm()) { alert('Please fill all required fields.'); return; }
+
+    const patSel = document.getElementById('patientSelect');
+    const selectedPatient = patients.find(p => p.id === patSel.value);
+    const selectedNurses = Array.from(document.getElementById('trtNurse').selectedOptions).map(o => o.value);
+    const docSel = document.getElementById('trtDoctor');
+
+    const record = {
+      patient_name: patSel.options[patSel.selectedIndex]?.text || '',
+      patient_id: selectedPatient?.patient_id || patSel.value,
+      diagnosis: document.getElementById('trtDiagnosis').value,
+      type: document.getElementById('trtType').value,
+      description: document.getElementById('trtDesc').value,
+      procedure: document.getElementById('trtProcedure').value,
+      doctor_id: docSel.value,
+      doctor_name: docSel.options[docSel.selectedIndex]?.text || '',
+      nurses: selectedNurses,
+      date: document.getElementById('trtDate').value,
+      status: document.getElementById('trtStatus').value,
+    };
+
+    const btn = document.getElementById('submitBtn');
+    btn.disabled = true;
+    btn.innerHTML = 'Saving...';
+
+    try {
+      let treatments = getTreatments();
+      if (editingId) {
+        const index = treatments.findIndex(t => t.id === editingId);
+        if (index !== -1) { treatments[index] = { ...treatments[index], ...record, id: editingId }; }
+        alert('Treatment updated successfully.');
+      } else {
+        const newId = 't' + Date.now();
+        treatments.push({ ...record, id: newId });
+        alert('Treatment saved successfully.');
+      }
+      saveTreatments(treatments);
+      clearForm();
+      loadTreatments();
+    } catch (err) { alert('Error: ' + err.message); }
+    finally { btn.disabled = false; btn.innerHTML = editingId ? 'Update Treatment' : 'Save Treatment'; }
+  });
+
+  window.editTreatment = (id) => {
+    const t = allTreatments.find(t => t.id === id);
+    if (!t) return;
+    editingId = id;
+    document.getElementById('formTitle').textContent = 'Edit Treatment';
+    document.getElementById('submitBtn').innerHTML = 'Update Treatment';
+    document.getElementById('trtId').value = t.id;
+    document.getElementById('patientSelect').value = t.patient_id;
+    document.getElementById('patientId').value = t.patient_id || '';
+    document.getElementById('trtDiagnosis').value = t.diagnosis || '';
+    document.getElementById('trtType').value = t.type || 'Medication';
+    document.getElementById('trtDesc').value = t.description || '';
+    document.getElementById('trtProcedure').value = t.procedure || '';
+    document.getElementById('trtDoctor').value = t.doctor_id || '';
+    document.getElementById('trtDate').value = t.date || '';
+    document.getElementById('trtStatus').value = t.status || 'Pending';
+    if (Array.isArray(t.nurses)) {
+      const sel = document.getElementById('trtNurse');
+      Array.from(sel.options).forEach(opt => { opt.selected = t.nurses.includes(opt.value); });
+    }
+    document.getElementById('formPanel').scrollIntoView({ behavior: 'smooth' });
+  };
+
+  window.deleteTreatment = (id) => {
+    if (confirm('Delete this treatment record? This cannot be undone.')) {
+      let treatments = getTreatments();
+      treatments = treatments.filter(t => t.id !== id);
+      saveTreatments(treatments);
+      loadTreatments();
+      alert('Treatment deleted.');
+    }
+  };
+
+  function clearForm() {
+    document.getElementById('treatmentForm').reset();
+    document.getElementById('trtId').value = '';
+    document.getElementById('patientId').value = '';
+    editingId = null;
+    clearValidation();
+  }
+
+  window.clearFilters = () => {
+    document.getElementById('filterStatus').value = '';
+    document.getElementById('filterType').value = '';
+    document.getElementById('globalSearch').value = '';
+    renderTable(allTreatments);
+  };
+
+  document.getElementById('patientSelect').addEventListener('change', (e) => {
+    const opt = e.target.options[e.target.selectedIndex];
+    document.getElementById('patientId').value = opt.dataset?.pid || opt.value || '';
+  });
+
+  ['filterStatus','filterType'].forEach(id => {
+    document.getElementById(id).addEventListener('change', () => renderTable(applyFilters(allTreatments)));
+  });
+
+  document.getElementById('globalSearch').addEventListener('input', () => {
+    renderTable(applyFilters(allTreatments));
+  });
+
+  document.getElementById('exportBtn').addEventListener('click', () => {
+    const headers = ['id','patient_name','diagnosis','type','doctor_name','date','status'];
+    const csvRows = [headers.join(',')];
+    allTreatments.forEach(t => {
+      const row = headers.map(h => `"${(t[h] || '').replace(/"/g, '""')}"`).join(',');
+      csvRows.push(row);
+    });
+    const blob = new Blob([csvRows.join('\n')], { type: 'text/csv' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `treatments_${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+    URL.revokeObjectURL(link.href);
+    alert('Export completed.');
+  });
+
+  window.addEventListener('load', () => {
+    loadDoctors();
+    loadNurses();
+    loadPatients();
+    loadTreatments();
+  });
+</script>
+</body>
+</html>

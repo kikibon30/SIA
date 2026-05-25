@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Patients — MedCenter SIA</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <link rel="stylesheet" href="/assets/css/style.css">
+</head>
+<body>
+
+<div class="app-shell">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-logo">HC</div>
+      <div class="sidebar-brand">
+        <div class="sidebar-brand-name">MedCenter SIA</div>
+        <div class="sidebar-brand-sub">Appointment System</div>
+      </div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">Main</div>
+      <a href="/index.html" class="nav-item">
+        <span class="nav-label">Dashboard</span>
+      </a>
+      <a href="/pages/appointment.html" class="nav-item">
+        <span class="nav-label">Appointments</span>
+      </a>
+      <a href="/pages/treatment.html" class="nav-item">
+        <span class="nav-label">Treatments</span>
+      </a>
+      <a href="/pages/patient.html" class="nav-item">
+        <span class="nav-label">Patients</span>
+      </a>
+      <div class="nav-section-label">System</div>
+      <a href="#" class="nav-item">
+        <span class="nav-label">Settings</span>
+      </a>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="db-status">
+        <span class="db-status-dot"></span>
+        <span class="db-status-text">Connected</span>
+      </div>
+      <div class="user-card">
+        <div class="user-avatar">AD</div>
+        <div class="user-info">
+          <div class="user-name">Admin User</div>
+          <div class="user-role">System Administrator</div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN CONTENT -->
+  <div class="main-content">
+
+    <header class="topbar">
+      <div class="topbar-left">
+        <div>
+          <div class="page-title">Patients</div>
+          <div class="page-breadcrumb">Manage patient records</div>
+        </div>
+      </div>
+      <div class="topbar-right">
+        <div class="topbar-search">
+          <span>🔍</span>
+          <input type="text" id="globalSearch" placeholder="Search by name, ID, phone..." />
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="openNewForm()">New Patient</button>
+        <button class="topbar-btn" id="exportBtn" title="Export CSV">⬇</button>
+      </div>
+    </header>
+
+    <main class="page-content">
+
+      <!-- Stats -->
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-value" id="statTotal">—</div>
+          <div class="stat-label">Total Patients</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="statActive">—</div>
+          <div class="stat-label">Active Records</div>
+        </div>
+      </div>
+
+      <!-- Split Layout -->
+      <div class="split-layout">
+
+        <!-- Form Panel -->
+        <div class="split-panel" id="formPanel">
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title" id="formTitle">New Patient</span>
+              <button class="btn btn-secondary btn-sm" onclick="clearForm()">Clear</button>
+            </div>
+            <div class="card-body" style="padding: 24px;">
+              <form id="patientForm" novalidate>
+                <input type="hidden" id="patientId" />
+                <div class="form-grid">
+                  <div class="form-group">
+                    <label>Full Name <span class="required">*</span></label>
+                    <input type="text" class="form-control" id="fullName" required placeholder="Enter full name" />
+                    <div class="form-error">Required</div>
+                  </div>
+                  <div class="form-group">
+                    <label>Patient ID <span class="required">*</span></label>
+                    <input type="text" class="form-control" id="patientCode" required placeholder="e.g., P001" />
+                    <div class="form-error">Required</div>
+                  </div>
+                  <div class="form-group">
+                    <label>Date of Birth</label>
+                    <input type="date" class="form-control" id="dob" />
+                  </div>
+                  <div class="form-group">
+                    <label>Gender</label>
+                    <select class="form-control" id="gender">
+                      <option value="">Select</option>
+                      <option value="Male">Male</option>
+                      <option value="Female">Female</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label>Phone Number</label>
+                    <input type="tel" class="form-control" id="phone" placeholder="Contact number" />
+                  </div>
+                  <div class="form-group">
+                    <label>Email</label>
+                    <input type="email" class="form-control" id="email" placeholder="Email address" />
+                  </div>
+                  <div class="form-group">
+                    <label>Address</label>
+                    <textarea class="form-control" id="address" rows="2" placeholder="Full address"></textarea>
+                  </div>
+                  <div class="form-group">
+                    <label>Blood Type</label>
+                    <select class="form-control" id="bloodType">
+                      <option value="">Select</option>
+                      <option value="A+">A+</option>
+                      <option value="A-">A-</option>
+                      <option value="B+">B+</option>
+                      <option value="B-">B-</option>
+                      <option value="O+">O+</option>
+                      <option value="O-">O-</option>
+                      <option value="AB+">AB+</option>
+                      <option value="AB-">AB-</option>
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label>Status</label>
+                    <select class="form-control" id="status">
+                      <option value="Active">Active</option>
+                      <option value="Inactive">Inactive</option>
+                    </select>
+                  </div>
+                </div>
+                <div style="margin-top: 24px;">
+                  <button type="submit" class="btn btn-primary" style="width: 100%;" id="submitBtn">Save Patient</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+
+        <!-- Table Panel -->
+        <div>
+          <div class="card">
+            <div class="filter-bar">
+              <div class="filter-group">
+                <select class="form-control" id="filterStatus" style="min-width: 120px;">
+                  <option value="">All Status</option>
+                  <option value="Active">Active</option>
+                  <option value="Inactive">Inactive</option>
+                </select>
+              </div>
+              <div class="filter-actions">
+                <button class="btn btn-secondary btn-sm" onclick="clearFilters()">Clear</button>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Patient ID</th>
+                    <th>Name</th>
+                    <th>Phone</th>
+                    <th>Email</th>
+                    <th>Status</th>
+                    <th style="text-align: right;">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="patientTableBody">
+                  <tr>
+                    <td colspan="6"><div class="empty-state">Loading patients...</div></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div style="padding: 12px 24px; border-top: 1px solid #eef2ff; display: flex; justify-content: space-between;">
+              <span class="text-muted" id="tableCount"></span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </main>
+  </div>
+</div>
+
+<div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+<script>
+  // MOCK DATABASE - localStorage
+  const STORAGE_KEY = 'med_patients';
+
+  function initMockData() {
+    if (!localStorage.getItem(STORAGE_KEY)) {
+      const mockPatients = [
+        { id: 'p1', fullName: 'Emma Johnson', patientCode: 'P001', dob: '1985-03-15', gender: 'Female', phone: '+1 555-0101', email: 'emma.j@example.com', address: '123 Main St, Boston, MA', bloodType: 'O+', status: 'Active' },
+        { id: 'p2', fullName: 'Michael Chen', patientCode: 'P002', dob: '1992-07-22', gender: 'Male', phone: '+1 555-0102', email: 'michael.c@example.com', address: '456 Oak Ave, San Francisco, CA', bloodType: 'A+', status: 'Active' },
+        { id: 'p3', fullName: 'Sophia Lee', patientCode: 'P003', dob: '1978-11-30', gender: 'Female', phone: '+1 555-0103', email: 'sophia.l@example.com', address: '789 Pine Rd, Austin, TX', bloodType: 'B+', status: 'Active' },
+        { id: 'p4', fullName: 'James Brown', patientCode: 'P004', dob: '1995-05-10', gender: 'Male', phone: '+1 555-0104', email: 'james.b@example.com', address: '321 Elm St, Seattle, WA', bloodType: 'AB+', status: 'Inactive' }
+      ];
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(mockPatients));
+    }
+  }
+  initMockData();
+
+  function getPatients() { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); }
+  function savePatients(data) { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }
+
+  let allPatients = [];
+  let editingId = null;
+
+  function loadPatients() {
+    allPatients = getPatients();
+    renderTable(applyFilters(allPatients));
+    updateStats(allPatients);
+  }
+
+  function applyFilters(data) {
+    const status = document.getElementById('filterStatus').value;
+    const search = document.getElementById('globalSearch').value.toLowerCase();
+    return data.filter(p => {
+      if (status && p.status !== status) return false;
+      if (search && !p.fullName?.toLowerCase().includes(search) && !p.patientCode?.toLowerCase().includes(search) && !p.phone?.toLowerCase().includes(search)) return false;
+      return true;
+    });
+  }
+
+  function renderTable(data) {
+    const tbody = document.getElementById('patientTableBody');
+    document.getElementById('tableCount').textContent = `${data.length} patient${data.length !== 1 ? 's' : ''}`;
+    
+    if (!data.length) {
+      tbody.innerHTML = `<tr><td colspan="6"><div class="empty-state">No patients found</div></td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = data.map(p => `
+      <tr>
+        <td><strong>${p.patientCode}</strong></td>
+        <td>${p.fullName}</td>
+        <td>${p.phone || '—'}</td>
+        <td>${p.email || '—'}</td>
+        <td><span class="badge ${p.status === 'Active' ? 'badge-completed' : 'badge-cancelled'}" style="display:inline-block; padding:4px 10px; border-radius:40px; font-size:0.7rem; background:${p.status === 'Active' ? '#dcfce7' : '#fee2e2'}; color:${p.status === 'Active' ? '#166534' : '#991b1b'};">${p.status}</span></td>
+        <td><div class="table-actions"><button class="btn btn-secondary btn-sm btn-icon" onclick="editPatient('${p.id}')">Edit</button><button class="btn btn-danger btn-sm btn-icon" onclick="deletePatient('${p.id}')">Delete</button></div></td>
+      </tr>
+    `).join('');
+  }
+
+  function updateStats(data) {
+    document.getElementById('statTotal').textContent = data.length;
+    document.getElementById('statActive').textContent = data.filter(p => p.status === 'Active').length;
+  }
+
+  function openNewForm() {
+    editingId = null;
+    document.getElementById('formTitle').textContent = 'New Patient';
+    document.getElementById('submitBtn').innerHTML = 'Save Patient';
+    clearForm();
+    document.getElementById('formPanel').scrollIntoView({ behavior: 'smooth' });
+  }
+
+  function validateForm() {
+    let valid = true;
+    const fullName = document.getElementById('fullName');
+    const patientCode = document.getElementById('patientCode');
+    
+    if (!fullName.value.trim()) {
+      fullName.closest('.form-group').classList.add('error');
+      valid = false;
+    } else {
+      fullName.closest('.form-group').classList.remove('error');
+    }
+    
+    if (!patientCode.value.trim()) {
+      patientCode.closest('.form-group').classList.add('error');
+      valid = false;
+    } else {
+      patientCode.closest('.form-group').classList.remove('error');
+    }
+    
+    return valid;
+  }
+
+  function clearValidation() {
+    document.querySelectorAll('.form-group').forEach(g => g.classList.remove('error'));
+  }
+
+  document.getElementById('patientForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    clearValidation();
+    if (!validateForm()) {
+      alert('Please fill all required fields.');
+      return;
+    }
+
+    const record = {
+      fullName: document.getElementById('fullName').value.trim(),
+      patientCode: document.getElementById('patientCode').value.trim(),
+      dob: document.getElementById('dob').value,
+      gender: document.getElementById('gender').value,
+      phone: document.getElementById('phone').value,
+      email: document.getElementById('email').value,
+      address: document.getElementById('address').value,
+      bloodType: document.getElementById('bloodType').value,
+      status: document.getElementById('status').value,
+    };
+
+    let patients = getPatients();
+    
+    if (editingId) {
+      const index = patients.findIndex(p => p.id === editingId);
+      if (index !== -1) {
+        patients[index] = { ...patients[index], ...record, id: editingId };
+      }
+      alert('Patient updated successfully.');
+    } else {
+      const newId = 'p' + Date.now();
+      patients.push({ ...record, id: newId });
+      alert('Patient added successfully.');
+    }
+    
+    savePatients(patients);
+    clearForm();
+    loadPatients();
+  });
+
+  window.editPatient = (id) => {
+    const patient = allPatients.find(p => p.id === id);
+    if (!patient) return;
+    editingId = id;
+    document.getElementById('formTitle').textContent = 'Edit Patient';
+    document.getElementById('submitBtn').innerHTML = 'Update Patient';
+    document.getElementById('patientId').value = patient.id;
+    document.getElementById('fullName').value = patient.fullName || '';
+    document.getElementById('patientCode').value = patient.patientCode || '';
+    document.getElementById('dob').value = patient.dob || '';
+    document.getElementById('gender').value = patient.gender || '';
+    document.getElementById('phone').value = patient.phone || '';
+    document.getElementById('email').value = patient.email || '';
+    document.getElementById('address').value = patient.address || '';
+    document.getElementById('bloodType').value = patient.bloodType || '';
+    document.getElementById('status').value = patient.status || 'Active';
+    document.getElementById('formPanel').scrollIntoView({ behavior: 'smooth' });
+  };
+
+  window.deletePatient = (id) => {
+    if (confirm('Delete this patient record? This cannot be undone.')) {
+      let patients = getPatients();
+      patients = patients.filter(p => p.id !== id);
+      savePatients(patients);
+      loadPatients();
+      if (editingId === id) clearForm();
+      alert('Patient deleted.');
+    }
+  };
+
+  function clearForm() {
+    document.getElementById('patientForm').reset();
+    document.getElementById('patientId').value = '';
+    editingId = null;
+    clearValidation();
+    document.getElementById('formTitle').textContent = 'New Patient';
+    document.getElementById('submitBtn').innerHTML = 'Save Patient';
+    document.getElementById('status').value = 'Active';
+  }
+
+  window.clearFilters = () => {
+    document.getElementById('filterStatus').value = '';
+    document.getElementById('globalSearch').value = '';
+    renderTable(allPatients);
+  };
+
+  document.getElementById('filterStatus').addEventListener('change', () => {
+    renderTable(applyFilters(allPatients));
+  });
+
+  document.getElementById('globalSearch').addEventListener('input', () => {
+    renderTable(applyFilters(allPatients));
+  });
+
+  document.getElementById('exportBtn').addEventListener('click', () => {
+    const headers = ['Patient ID', 'Full Name', 'Date of Birth', 'Gender', 'Phone', 'Email', 'Address', 'Blood Type', 'Status'];
+    const csvRows = [headers.join(',')];
+    allPatients.forEach(p => {
+      const row = [
+        `"${p.patientCode || ''}"`,
+        `"${p.fullName || ''}"`,
+        `"${p.dob || ''}"`,
+        `"${p.gender || ''}"`,
+        `"${p.phone || ''}"`,
+        `"${p.email || ''}"`,
+        `"${(p.address || '').replace(/"/g, '""')}"`,
+        `"${p.bloodType || ''}"`,
+        `"${p.status || ''}"`
+      ].join(',');
+      csvRows.push(row);
+    });
+    const blob = new Blob([csvRows.join('\n')], { type: 'text/csv' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `patients_${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+    URL.revokeObjectURL(link.href);
+    alert('Export completed.');
+  });
+
+  window.addEventListener('load', () => {
+    loadPatients();
+  });
+</script>
+</body>
+</html>
