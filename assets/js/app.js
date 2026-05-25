@@ -318,11 +318,12 @@ document.addEventListener('DOMContentLoaded', () => {
   // Update DB status indicator
   updateDBStatus(window._supabaseReady === true);
 
-  // Listen for cross-tab events
-  SIABus.on('*', ({ type }) => {
-    // Optionally refresh stats on any mutation
-    if (type && (type.includes(':insert') || type.includes(':update') || type.includes(':delete'))) {
-      if (typeof window.refreshStats === 'function') window.refreshStats();
-    }
-  });
+  // Listen for cross-tab events if available
+  if (typeof SIABus !== 'undefined' && SIABus && typeof SIABus.on === 'function') {
+    SIABus.on('*', ({ type }) => {
+      if (type && (type.includes(':insert') || type.includes(':update') || type.includes(':delete'))) {
+        if (typeof window.refreshStats === 'function') window.refreshStats();
+      }
+    });
+  }
 });

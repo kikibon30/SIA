@@ -1,227 +1,174 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Dashboard — MedCenter SIA</title>
-  <!-- Supabase Library -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <!-- Google Fonts -->
-  <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;400;500;600;700&display=swap" rel="stylesheet">
-  <!-- External CSS - separate file (apply your provided CSS here) -->
-  <link rel="stylesheet" href="/assets/css/style.css">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dashboard — MedCenter SIA</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Inter', sans-serif; background: #f4f6fa; color: #1e293b; }
+        .app-shell { display: flex; min-height: 100vh; }
+        .sidebar { width: 280px; background: linear-gradient(180deg, #0f172a 0%, #111827 100%); color: #e2e8f0; display: flex; flex-direction: column; position: sticky; top: 0; height: 100vh; }
+        .sidebar-header { display: flex; align-items: center; gap: 12px; padding: 24px 20px; border-bottom: 1px solid #334155; }
+        .sidebar-logo { width: 40px; height: 40px; background: #2dd4bf; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 20px; color: #0f172a; }
+        .sidebar-brand-name { font-weight: 700; font-size: 1.2rem; color: white; }
+        .sidebar-brand-sub { font-size: 0.75rem; color: #94a3b8; }
+        .sidebar-nav { flex: 1; padding: 24px 16px; display: flex; flex-direction: column; gap: 4px; }
+        .nav-section-label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1px; color: #64748b; margin-top: 12px; margin-bottom: 8px; padding-left: 12px; }
+        .nav-item { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 12px; color: #cbd5e1; text-decoration: none; font-weight: 500; transition: all 0.2s; }
+        .nav-item:hover, .nav-item.active { background: #334155; color: white; }
+        .sidebar-footer { padding: 20px; border-top: 1px solid #334155; }
+        .db-status { display: flex; align-items: center; gap: 8px; font-size: 0.75rem; margin-bottom: 16px; background: #1e293b; padding: 8px 12px; border-radius: 40px; }
+        .db-status-dot { width: 8px; height: 8px; border-radius: 50%; }
+        .user-card { display: flex; align-items: center; gap: 12px; }
+        .user-avatar { width: 40px; height: 40px; background: #475569; border-radius: 40px; display: flex; align-items: center; justify-content: center; font-weight: 600; }
+        .main-content { flex: 1; display: flex; flex-direction: column; overflow-x: auto; }
+        .topbar { background: white; padding: 16px 28px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e2e8f0; position: sticky; top: 0; z-index: 10; flex-wrap: wrap; gap: 16px; }
+        .page-title { font-size: 1.5rem; font-weight: 700; }
+        .page-breadcrumb { font-size: 0.8rem; color: #64748b; }
+        .topbar-search { display: flex; align-items: center; background: #f1f5f9; padding: 8px 14px; border-radius: 40px; gap: 8px; }
+        .topbar-search input { border: none; background: transparent; outline: none; width: 220px; }
+        .topbar-btn { background: #f1f5f9; border: none; padding: 8px 12px; border-radius: 30px; cursor: pointer; font-size: 1.1rem; }
+        .topbar-badge { background: #ef4444; color: white; border-radius: 20px; padding: 0 6px; margin-left: 4px; font-size: 0.7rem; }
+        .page-content { padding: 28px; }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px; margin-bottom: 32px; }
+        .stat-card { background: white; border-radius: 24px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+        .stat-value { font-size: 2.2rem; font-weight: 700; margin: 12px 0 4px; }
+        .stat-label { font-size: 0.85rem; font-weight: 500; color: #475569; }
+        .stat-sublabel { font-size: 0.7rem; color: #94a3b8; margin-top: 6px; }
+        .dashboard-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 28px; }
+        .card { background: white; border-radius: 24px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); overflow: hidden; margin-bottom: 24px; }
+        .card-header { padding: 18px 24px; border-bottom: 1px solid #eef2ff; display: flex; justify-content: space-between; align-items: center; }
+        .card-title { font-weight: 700; font-size: 1.1rem; }
+        .btn-secondary { background: #f1f5f9; padding: 6px 14px; border-radius: 30px; text-decoration: none; font-size: 0.75rem; font-weight: 500; color: #334155; display: inline-block; }
+        .recent-item { display: flex; align-items: center; gap: 16px; padding: 14px 20px; border-bottom: 1px solid #f1f5f9; }
+        .recent-item-icon { width: 40px; height: 40px; background: #f1f5f9; border-radius: 40px; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 0.85rem; }
+        .recent-item-content { flex: 1; }
+        .recent-item-title { font-weight: 600; }
+        .recent-item-sub { font-size: 0.75rem; color: #5b6e8c; }
+        .quick-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .quick-action-card { background: #f8fafc; padding: 16px; border-radius: 20px; text-decoration: none; border: 1px solid #eef2ff; display: block; }
+        .quick-action-title { font-weight: 600; font-size: 0.9rem; color: #0f172a; }
+        .quick-action-sub { font-size: 0.7rem; color: #5b6e8c; }
+        .table-wrap { overflow-x: auto; }
+        .data-table { width: 100%; border-collapse: collapse; }
+        .data-table th, .data-table td { text-align: left; padding: 14px 16px; border-bottom: 1px solid #f0f2f5; }
+        .data-table th { background: #f8fafc; font-weight: 600; font-size: 0.8rem; }
+        .badge { display: inline-block; padding: 4px 10px; border-radius: 40px; font-size: 0.7rem; font-weight: 500; }
+        .badge-scheduled { background: #dbeafe; color: #1e40af; }
+        .badge-completed { background: #dcfce7; color: #166534; }
+        .badge-pending { background: #ffedd5; color: #9a3412; }
+        .badge-cancelled { background: #fee2e2; color: #991b1b; }
+        .empty-state { text-align: center; padding: 40px 20px; color: #94a3b8; }
+        .text-muted { color: #64748b; font-size: 0.8rem; }
+        .status-connected { background: #10b981; }
+        .status-disconnected { background: #ef4444; }
+        @media (max-width: 768px) { .dashboard-grid { grid-template-columns: 1fr; } }
+    </style>
 </head>
 <body>
 
 <div class="app-shell">
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <div class="sidebar-logo">HC</div>
+            <div class="sidebar-brand">
+                <div class="sidebar-brand-name">MedCenter SIA</div>
+                <div class="sidebar-brand-sub">Appointment System</div>
+            </div>
+        </div>
+        <nav class="sidebar-nav">
+            <div class="nav-section-label">Main</div>
+            <a href="index.html" class="nav-item" data-page="index.html">Dashboard</a>
+            <a href="pages/appointment.html" class="nav-item" data-page="appointment.html">Appointments</a>
+            <a href="pages/treatment.html" class="nav-item" data-page="treatment.html">Treatments</a>
+            <a href="pages/patient.html" class="nav-item" data-page="patient.html">Patients</a>
+            <div class="nav-section-label">Reports</div>
+            <a href="#" class="nav-item" id="exportDataBtn">Export Data</a>
+            <div class="nav-section-label">System</div>
+            <a href="#" class="nav-item">Settings</a>
+        </nav>
+        <div class="sidebar-footer">
+            <div class="db-status">
+                <span class="db-status-dot" id="dbStatusDot"></span>
+                <span class="db-status-text" id="dbStatusText">Checking...</span>
+            </div>
+            <div class="user-card">
+                <div class="user-avatar">AD</div>
+                <div class="user-info">
+                    <div class="user-name">Admin User</div>
+                    <div class="user-role">System Administrator</div>
+                </div>
+            </div>
+        </div>
+    </aside>
 
-  <!-- SIDEBAR - no icons, plain text only -->
-  <aside class="sidebar" id="sidebar">
-    <div class="sidebar-header">
-      <div class="sidebar-logo">HC</div>
-      <div class="sidebar-brand">
-        <div class="sidebar-brand-name">MedCenter SIA</div>
-        <div class="sidebar-brand-sub">Appointment System</div>
-      </div>
+    <div class="main-content">
+        <header class="topbar">
+            <div class="topbar-left">
+                <div>
+                    <div class="page-title">Dashboard</div>
+                    <div class="page-breadcrumb">Overview · Today's summary</div>
+                </div>
+            </div>
+            <div class="topbar-right">
+                <div class="topbar-search">
+                    <span>🔍</span>
+                    <input type="text" id="globalSearchInput" placeholder="Search patients..." />
+                </div>
+                <button class="topbar-btn" id="refreshBtn">↻</button>
+                <button class="topbar-btn">🔔<span class="topbar-badge" id="notifBadge">0</span></button>
+            </div>
+        </header>
+
+        <main class="page-content">
+            <div class="stats-grid">
+                <div class="stat-card"><div class="stat-value" id="statTotal">—</div><div class="stat-label">Total Appointments</div><div class="stat-sublabel" id="statTodayApt"></div></div>
+                <div class="stat-card"><div class="stat-value" id="statUpcoming">—</div><div class="stat-label">Upcoming</div><div class="stat-sublabel">Scheduled appointments</div></div>
+                <div class="stat-card"><div class="stat-value" id="statTreatments">—</div><div class="stat-label">Total Treatments</div><div class="stat-sublabel" id="statActiveTrt"></div></div>
+                <div class="stat-card"><div class="stat-value" id="statCompleted">—</div><div class="stat-label">Completed Treatments</div><div class="stat-sublabel" id="statCompRate"></div></div>
+            </div>
+
+            <div class="dashboard-grid">
+                <div class="card">
+                    <div class="card-header"><span class="card-title">Recent Appointments</span><a href="pages/appointment.html" class="btn-secondary">View All</a></div>
+                    <div id="recentAppointments"><div class="empty-state">Loading appointments...</div></div>
+                </div>
+                <div style="display:flex; flex-direction:column; gap:20px;">
+                    <div class="card">
+                        <div class="card-header"><span class="card-title">Quick Actions</span></div>
+                        <div class="card-body">
+                            <div class="quick-actions">
+                                <a href="pages/appointment.html" class="quick-action-card"><div class="quick-action-title">New Appointment</div><div class="quick-action-sub">Schedule a patient</div></a>
+                                <a href="pages/treatment.html" class="quick-action-card"><div class="quick-action-title">Record Treatment</div><div class="quick-action-sub">Add treatment entry</div></a>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-header"><span class="card-title">Today's Schedule</span><span class="text-muted" id="todayDate"></span></div>
+                        <div id="todaySchedule"><div class="empty-state">No appointments today</div></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header"><span class="card-title">Recent Treatments</span><a href="pages/treatment.html" class="btn-secondary">View All</a></div>
+                <div class="table-wrap">
+                    <table class="data-table">
+                        <thead><tr><th>Patient</th><th>Diagnosis</th><th>Type</th><th>Doctor</th><th>Date</th><th>Status</th></tr></thead>
+                        <tbody id="treatmentTableBody"><tr><td colspan="6"><div class="empty-state">Loading treatments...</div></td></tr></tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
     </div>
-
-    <nav class="sidebar-nav">
-      <div class="nav-section-label">Main</div>
-      <a href="/index.html" class="nav-item">
-        <span class="nav-label">Dashboard</span>
-      </a>
-      <a href="/pages/appointment.html" class="nav-item">
-        <span class="nav-label">Appointments</span>
-      </a>
-      <a href="/pages/treatment.html" class="nav-item">
-        <span class="nav-label">Treatments</span>
-      </a>
-      <a href="/pages/patient.html" class="nav-item">
-        <span class="nav-label">Patients</span>
-      </a>
-
-      <div class="nav-section-label">Reports</div>
-      <a href="#" class="nav-item" id="exportDataBtn">
-        <span class="nav-label">Export Data</span>
-      </a>
-
-      <div class="nav-section-label">System</div>
-      <a href="#" class="nav-item">
-        <span class="nav-label">Settings</span>
-      </a>
-    </nav>
-
-    <div class="sidebar-footer">
-      <div class="db-status">
-        <span class="db-status-dot"></span>
-        <span class="db-status-text">Connected</span>
-      </div>
-      <div class="user-card">
-        <div class="user-avatar">AD</div>
-        <div class="user-info">
-          <div class="user-name">Admin User</div>
-          <div class="user-role">System Administrator</div>
-        </div>
-      </div>
-    </div>
-  </aside>
-
-  <!-- MAIN CONTENT -->
-  <div class="main-content">
-
-    <!-- Top Bar - plain text, no icons -->
-    <header class="topbar">
-      <div class="topbar-left">
-        <div>
-          <div class="page-title">Dashboard</div>
-          <div class="page-breadcrumb">Overview · Today's summary</div>
-        </div>
-      </div>
-      <div class="topbar-right">
-        <div class="topbar-search">
-          <span>🔍</span>
-          <input type="text" id="globalSearchInput" placeholder="Search patients, appointments..." />
-        </div>
-        <button class="topbar-btn" id="refreshBtn" title="Refresh data">↻</button>
-        <button class="topbar-btn" title="Notifications">
-          🔔
-          <span class="topbar-badge" id="notifBadge" style="background:#ef4444; color:white; border-radius:20px; padding:0 6px; margin-left:4px;">0</span>
-        </button>
-      </div>
-    </header>
-
-    <!-- Page Content -->
-    <main class="page-content">
-
-      <!-- KPI Stats - no icons -->
-      <div class="stats-grid">
-        <div class="stat-card">
-          <div class="stat-value" id="statTotal">—</div>
-          <div class="stat-label">Total Appointments</div>
-          <div class="stat-sublabel" id="statTodayApt"></div>
-        </div>
-
-        <div class="stat-card">
-          <div class="stat-value" id="statUpcoming">—</div>
-          <div class="stat-label">Upcoming</div>
-          <div class="stat-sublabel">Scheduled appointments</div>
-        </div>
-
-        <div class="stat-card">
-          <div class="stat-value" id="statTreatments">—</div>
-          <div class="stat-label">Total Treatments</div>
-          <div class="stat-sublabel" id="statActiveTrt"></div>
-        </div>
-
-        <div class="stat-card">
-          <div class="stat-value" id="statCompleted">—</div>
-          <div class="stat-label">Completed Treatments</div>
-          <div class="stat-sublabel" id="statCompRate"></div>
-        </div>
-      </div>
-
-      <!-- Two-column content -->
-      <div class="dashboard-grid">
-
-        <!-- Recent Appointments -->
-        <div class="card">
-          <div class="card-header">
-            <span class="card-title">Recent Appointments</span>
-            <a href="/pages/appointment.html" class="btn-secondary">View All</a>
-          </div>
-          <div class="card-body card-body--compact" id="recentAppointments">
-            <div class="empty-state">No appointments yet</div>
-          </div>
-        </div>
-
-        <!-- Quick Actions + Today's Schedule -->
-        <div style="display:flex;flex-direction:column;gap:20px;">
-
-          <!-- Quick Actions - plain text, no icons -->
-          <div class="card">
-            <div class="card-header">
-              <span class="card-title">Quick Actions</span>
-            </div>
-            <div class="card-body">
-              <div class="quick-actions">
-                <a href="/pages/appointment.html" class="quick-action-card">
-                  <div class="quick-action-text">
-                    <div class="quick-action-title">New Appointment</div>
-                    <div class="quick-action-sub">Schedule a patient</div>
-                  </div>
-                </a>
-                <a href="/pages/treatment.html" class="quick-action-card">
-                  <div class="quick-action-text">
-                    <div class="quick-action-title">Record Treatment</div>
-                    <div class="quick-action-sub">Add treatment entry</div>
-                  </div>
-                </a>
-                <a href="/pages/appointment.html" class="quick-action-card">
-                  <div class="quick-action-text">
-                    <div class="quick-action-title">Search History</div>
-                    <div class="quick-action-sub">Find patient records</div>
-                  </div>
-                </a>
-                <a href="/pages/treatment.html" class="quick-action-card">
-                  <div class="quick-action-text">
-                    <div class="quick-action-title">Assign Staff</div>
-                    <div class="quick-action-sub">Doctor & nurse</div>
-                  </div>
-                </a>
-              </div>
-            </div>
-          </div>
-
-          <!-- Today's Schedule -->
-          <div class="card">
-            <div class="card-header">
-              <span class="card-title">Today's Schedule</span>
-              <span class="text-muted" id="todayDate"></span>
-            </div>
-            <div class="card-body card-body--compact" id="todaySchedule">
-              <div class="empty-state">No appointments today</div>
-            </div>
-          </div>
-
-        </div>
-      </div>
-
-      <!-- Recent Treatments Table -->
-      <div class="card" style="margin-top:20px;">
-        <div class="card-header">
-          <span class="card-title">Recent Treatments</span>
-          <a href="/pages/treatment.html" class="btn-secondary">View All</a>
-        </div>
-        <div class="table-wrap">
-          <table id="treatmentTable">
-            <thead>
-              <tr>
-                <th>Patient</th>
-                <th>Diagnosis</th>
-                <th>Type</th>
-                <th>Doctor</th>
-                <th>Date</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody id="treatmentTableBody">
-              <tr>
-                <td colspan="6">
-                  <div class="empty-state">No treatments recorded</div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-    </main>
-  </div>
 </div>
 
-<!-- Mobile sidebar overlay -->
-<div class="sidebar-overlay" id="sidebarOverlay"></div>
-
+<script src="assets/js/supabase-config.js"></script>
+<script src="assets/js/db-helper.js"></script>
+<script src="assets/js/app.js"></script>
+<script src="assets/js/dashboard-page.js"></script>
 </body>
-  <script src="/assets/js/dashboard.js"></script>
 </html>

@@ -22,16 +22,16 @@
     </div>
     <nav class="sidebar-nav">
       <div class="nav-section-label">Main</div>
-      <a href="/index.html" class="nav-item">
+      <a href="../index.html" class="nav-item" data-page="index.html">
         <span class="nav-label">Dashboard</span>
       </a>
-      <a href="/pages/appointment.html" class="nav-item">
+      <a href="appointment.html" class="nav-item" data-page="appointment.html">
         <span class="nav-label">Appointments</span>
       </a>
-      <a href="/pages/treatment.html" class="nav-item">
+      <a href="treatment.html" class="nav-item" data-page="treatment.html">
         <span class="nav-label">Treatments</span>
       </a>
-      <a href="/pages/patient.html" class="nav-item">
+      <a href="patient.html" class="nav-item" data-page="patient.html">
         <span class="nav-label">Patients</span>
       </a>
       <div class="nav-section-label">System</div>
@@ -138,20 +138,6 @@
                     <textarea class="form-control" id="address" rows="2" placeholder="Full address"></textarea>
                   </div>
                   <div class="form-group">
-                    <label>Blood Type</label>
-                    <select class="form-control" id="bloodType">
-                      <option value="">Select</option>
-                      <option value="A+">A+</option>
-                      <option value="A-">A-</option>
-                      <option value="B+">B+</option>
-                      <option value="B-">B-</option>
-                      <option value="O+">O+</option>
-                      <option value="O-">O-</option>
-                      <option value="AB+">AB+</option>
-                      <option value="AB-">AB-</option>
-                    </select>
-                  </div>
-                  <div class="form-group">
                     <label>Status</label>
                     <select class="form-control" id="status">
                       <option value="Active">Active</option>
@@ -214,227 +200,9 @@
 
 <div class="sidebar-overlay" id="sidebarOverlay"></div>
 
-<script>
-  // MOCK DATABASE - localStorage
-  const STORAGE_KEY = 'med_patients';
-
-  function initMockData() {
-    if (!localStorage.getItem(STORAGE_KEY)) {
-      const mockPatients = [
-        { id: 'p1', fullName: 'Emma Johnson', patientCode: 'P001', dob: '1985-03-15', gender: 'Female', phone: '+1 555-0101', email: 'emma.j@example.com', address: '123 Main St, Boston, MA', bloodType: 'O+', status: 'Active' },
-        { id: 'p2', fullName: 'Michael Chen', patientCode: 'P002', dob: '1992-07-22', gender: 'Male', phone: '+1 555-0102', email: 'michael.c@example.com', address: '456 Oak Ave, San Francisco, CA', bloodType: 'A+', status: 'Active' },
-        { id: 'p3', fullName: 'Sophia Lee', patientCode: 'P003', dob: '1978-11-30', gender: 'Female', phone: '+1 555-0103', email: 'sophia.l@example.com', address: '789 Pine Rd, Austin, TX', bloodType: 'B+', status: 'Active' },
-        { id: 'p4', fullName: 'James Brown', patientCode: 'P004', dob: '1995-05-10', gender: 'Male', phone: '+1 555-0104', email: 'james.b@example.com', address: '321 Elm St, Seattle, WA', bloodType: 'AB+', status: 'Inactive' }
-      ];
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(mockPatients));
-    }
-  }
-  initMockData();
-
-  function getPatients() { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); }
-  function savePatients(data) { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }
-
-  let allPatients = [];
-  let editingId = null;
-
-  function loadPatients() {
-    allPatients = getPatients();
-    renderTable(applyFilters(allPatients));
-    updateStats(allPatients);
-  }
-
-  function applyFilters(data) {
-    const status = document.getElementById('filterStatus').value;
-    const search = document.getElementById('globalSearch').value.toLowerCase();
-    return data.filter(p => {
-      if (status && p.status !== status) return false;
-      if (search && !p.fullName?.toLowerCase().includes(search) && !p.patientCode?.toLowerCase().includes(search) && !p.phone?.toLowerCase().includes(search)) return false;
-      return true;
-    });
-  }
-
-  function renderTable(data) {
-    const tbody = document.getElementById('patientTableBody');
-    document.getElementById('tableCount').textContent = `${data.length} patient${data.length !== 1 ? 's' : ''}`;
-    
-    if (!data.length) {
-      tbody.innerHTML = `<tr><td colspan="6"><div class="empty-state">No patients found</div></td></tr>`;
-      return;
-    }
-
-    tbody.innerHTML = data.map(p => `
-      <tr>
-        <td><strong>${p.patientCode}</strong></td>
-        <td>${p.fullName}</td>
-        <td>${p.phone || '—'}</td>
-        <td>${p.email || '—'}</td>
-        <td><span class="badge ${p.status === 'Active' ? 'badge-completed' : 'badge-cancelled'}" style="display:inline-block; padding:4px 10px; border-radius:40px; font-size:0.7rem; background:${p.status === 'Active' ? '#dcfce7' : '#fee2e2'}; color:${p.status === 'Active' ? '#166534' : '#991b1b'};">${p.status}</span></td>
-        <td><div class="table-actions"><button class="btn btn-secondary btn-sm btn-icon" onclick="editPatient('${p.id}')">Edit</button><button class="btn btn-danger btn-sm btn-icon" onclick="deletePatient('${p.id}')">Delete</button></div></td>
-      </tr>
-    `).join('');
-  }
-
-  function updateStats(data) {
-    document.getElementById('statTotal').textContent = data.length;
-    document.getElementById('statActive').textContent = data.filter(p => p.status === 'Active').length;
-  }
-
-  function openNewForm() {
-    editingId = null;
-    document.getElementById('formTitle').textContent = 'New Patient';
-    document.getElementById('submitBtn').innerHTML = 'Save Patient';
-    clearForm();
-    document.getElementById('formPanel').scrollIntoView({ behavior: 'smooth' });
-  }
-
-  function validateForm() {
-    let valid = true;
-    const fullName = document.getElementById('fullName');
-    const patientCode = document.getElementById('patientCode');
-    
-    if (!fullName.value.trim()) {
-      fullName.closest('.form-group').classList.add('error');
-      valid = false;
-    } else {
-      fullName.closest('.form-group').classList.remove('error');
-    }
-    
-    if (!patientCode.value.trim()) {
-      patientCode.closest('.form-group').classList.add('error');
-      valid = false;
-    } else {
-      patientCode.closest('.form-group').classList.remove('error');
-    }
-    
-    return valid;
-  }
-
-  function clearValidation() {
-    document.querySelectorAll('.form-group').forEach(g => g.classList.remove('error'));
-  }
-
-  document.getElementById('patientForm').addEventListener('submit', (e) => {
-    e.preventDefault();
-    clearValidation();
-    if (!validateForm()) {
-      alert('Please fill all required fields.');
-      return;
-    }
-
-    const record = {
-      fullName: document.getElementById('fullName').value.trim(),
-      patientCode: document.getElementById('patientCode').value.trim(),
-      dob: document.getElementById('dob').value,
-      gender: document.getElementById('gender').value,
-      phone: document.getElementById('phone').value,
-      email: document.getElementById('email').value,
-      address: document.getElementById('address').value,
-      bloodType: document.getElementById('bloodType').value,
-      status: document.getElementById('status').value,
-    };
-
-    let patients = getPatients();
-    
-    if (editingId) {
-      const index = patients.findIndex(p => p.id === editingId);
-      if (index !== -1) {
-        patients[index] = { ...patients[index], ...record, id: editingId };
-      }
-      alert('Patient updated successfully.');
-    } else {
-      const newId = 'p' + Date.now();
-      patients.push({ ...record, id: newId });
-      alert('Patient added successfully.');
-    }
-    
-    savePatients(patients);
-    clearForm();
-    loadPatients();
-  });
-
-  window.editPatient = (id) => {
-    const patient = allPatients.find(p => p.id === id);
-    if (!patient) return;
-    editingId = id;
-    document.getElementById('formTitle').textContent = 'Edit Patient';
-    document.getElementById('submitBtn').innerHTML = 'Update Patient';
-    document.getElementById('patientId').value = patient.id;
-    document.getElementById('fullName').value = patient.fullName || '';
-    document.getElementById('patientCode').value = patient.patientCode || '';
-    document.getElementById('dob').value = patient.dob || '';
-    document.getElementById('gender').value = patient.gender || '';
-    document.getElementById('phone').value = patient.phone || '';
-    document.getElementById('email').value = patient.email || '';
-    document.getElementById('address').value = patient.address || '';
-    document.getElementById('bloodType').value = patient.bloodType || '';
-    document.getElementById('status').value = patient.status || 'Active';
-    document.getElementById('formPanel').scrollIntoView({ behavior: 'smooth' });
-  };
-
-  window.deletePatient = (id) => {
-    if (confirm('Delete this patient record? This cannot be undone.')) {
-      let patients = getPatients();
-      patients = patients.filter(p => p.id !== id);
-      savePatients(patients);
-      loadPatients();
-      if (editingId === id) clearForm();
-      alert('Patient deleted.');
-    }
-  };
-
-  function clearForm() {
-    document.getElementById('patientForm').reset();
-    document.getElementById('patientId').value = '';
-    editingId = null;
-    clearValidation();
-    document.getElementById('formTitle').textContent = 'New Patient';
-    document.getElementById('submitBtn').innerHTML = 'Save Patient';
-    document.getElementById('status').value = 'Active';
-  }
-
-  window.clearFilters = () => {
-    document.getElementById('filterStatus').value = '';
-    document.getElementById('globalSearch').value = '';
-    renderTable(allPatients);
-  };
-
-  document.getElementById('filterStatus').addEventListener('change', () => {
-    renderTable(applyFilters(allPatients));
-  });
-
-  document.getElementById('globalSearch').addEventListener('input', () => {
-    renderTable(applyFilters(allPatients));
-  });
-
-  document.getElementById('exportBtn').addEventListener('click', () => {
-    const headers = ['Patient ID', 'Full Name', 'Date of Birth', 'Gender', 'Phone', 'Email', 'Address', 'Blood Type', 'Status'];
-    const csvRows = [headers.join(',')];
-    allPatients.forEach(p => {
-      const row = [
-        `"${p.patientCode || ''}"`,
-        `"${p.fullName || ''}"`,
-        `"${p.dob || ''}"`,
-        `"${p.gender || ''}"`,
-        `"${p.phone || ''}"`,
-        `"${p.email || ''}"`,
-        `"${(p.address || '').replace(/"/g, '""')}"`,
-        `"${p.bloodType || ''}"`,
-        `"${p.status || ''}"`
-      ].join(',');
-      csvRows.push(row);
-    });
-    const blob = new Blob([csvRows.join('\n')], { type: 'text/csv' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `patients_${new Date().toISOString().split('T')[0]}.csv`;
-    link.click();
-    URL.revokeObjectURL(link.href);
-    alert('Export completed.');
-  });
-
-  window.addEventListener('load', () => {
-    loadPatients();
-  });
-</script>
+<script src="../assets/js/supabase-config.js"></script>
+<script src="../assets/js/db-helper.js"></script>
+<script src="../assets/js/app.js"></script>
+<script src="../assets/js/patient-page.js"></script>
 </body>
 </html>

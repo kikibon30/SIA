@@ -29,6 +29,22 @@ CREATE TABLE IF NOT EXISTS treatments (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- PATIENTS TABLE
+CREATE TABLE IF NOT EXISTS patients (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    full_name VARCHAR(255) NOT NULL,
+    patient_code VARCHAR(100) UNIQUE,
+    dob DATE,
+    gender VARCHAR(50),
+    phone VARCHAR(50),
+    email VARCHAR(255),
+    address TEXT,
+    blood_type VARCHAR(10),
+    status VARCHAR(50) DEFAULT 'Active',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -- STAFF ASSIGNMENTS TABLE
 CREATE TABLE IF NOT EXISTS staff_assignments (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,

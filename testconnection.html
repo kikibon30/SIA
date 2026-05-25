@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Supabase Connection Debug</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            max-width: 900px;
+            margin: 20px auto;
+            padding: 20px;
+            background: #1e1e1e;
+            color: #d4d4d4;
+        }
+        .test-card {
+            background: #2d2d2d;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-left: 4px solid #007acc;
+        }
+        .success { color: #4ec9b0; }
+        .error { color: #f48771; }
+        .info { color: #9cdcfe; }
+        .warning { color: #ce9178; }
+        button {
+            background: #0e639c;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+            font-size: 14px;
+        }
+        button:hover { background: #1177bb; }
+        pre {
+            background: #1e1e1e;
+            padding: 10px;
+            overflow-x: auto;
+            border-radius: 4px;
+            border: 1px solid #3e3e3e;
+            font-size: 12px;
+        }
+        .log-line {
+            font-family: monospace;
+            margin: 5px 0;
+            padding: 5px;
+            border-bottom: 1px solid #3e3e3e;
+        }
+        .status {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        .status-success { background: #4ec9b0; color: #1e1e1e; }
+        .status-error { background: #f48771; color: #1e1e1e; }
+        .status-testing { background: #ce9178; color: #1e1e1e; }
+        input, textarea {
+            width: 100%;
+            padding: 8px;
+            margin: 5px 0;
+            background: #3c3c3c;
+            border: 1px solid #555;
+            color: #d4d4d4;
+            border-radius: 4px;
+            font-family: monospace;
+        }
+        label {
+            font-weight: bold;
+            margin-top: 10px;
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔧 Supabase Connection Debug Tool</h1>
+    
+    <div class="test-card">
+        <h2>📋 Current Configuration</h2>
+        <label>Supabase URL:</label>
+        <input type="text" id="supabaseUrl" value="https://cgczzowbxhjpncngmhrb.supabase.co" readonly>
+        <label>Supabase Anon Key:</label>
+        <input type="text" id="supabaseKey" value="sb_publishable_gEQEaxJLcptRV-IA1Qlq8g_yBdknQwT" readonly>
+        <label>Alternative Key Format (try this if above fails):</label>
+        <input type="text" id="altKey" placeholder="Paste alternative key here">
+        <button onclick="useAlternativeKey()">Use Alternative Key</button>
+    </div>
+
+    <div class="test-card">
+        <h2>🎯 Test Options</h2>
+        <button onclick="testBasicConnection()">1. Test Basic Connection</button>
+        <button onclick="testWithDifferentEndpoint()">2. Test REST API Direct</button>
+        <button onclick="checkCORS()">3. Check CORS Issues</button>
+        <button onclick="createTablesSQL()">4. Show SQL to Create Tables</button>
+        <button onclick="clearLogs()">Clear Logs</button>
+    </div>
+
+    <div class="test-card">
+        <h2>📊 Connection Status</h2>
+        <div id="statusArea">
+            <span id="statusBadge" class="status status-testing">Ready</span>
+            <span id="statusMessage">Click a test button to begin</span>
+        </div>
+    </div>
+
+    <div class="test-card">
+        <h2>📝 Debug Logs</h2>
+        <div id="logs" style="height: 400px; overflow-y: auto; background: #1e1e1e; padding: 10px;">
+            <div class="log-line info">[System] Ready for testing...</div>
+        </div>
+    </div>
+
+    <script>
+        const supabaseUrl = 'https://cgczzowbxhjpncngmhrb.supabase.co';
+        const supabaseKey = 'sb_publishable_gEQEaxJLcptRV-IA1Qlq8g_yBdknQwT';
+        let supabaseClient = null;
+        
+        function addLog(message, type = 'info') {
+            const logsDiv = document.getElementById('logs');
+            const timestamp = new Date().toLocaleTimeString();
+            const logClass = type === 'success' ? 'success' : (type === 'error' ? 'error' : (type === 'warning' ? 'warning' : 'info'));
+            logsDiv.innerHTML += `<div class="log-line ${logClass}">[${timestamp}] ${message}</div>`;
+            logsDiv.scrollTop = logsDiv.scrollHeight;
+        }
+        
+        function updateStatus(status, message) {
+            const badge = document.getElementById('statusBadge');
+            const msgSpan = document.getElementById('statusMessage');
+            
+            badge.className = 'status';
+            if (status === 'success') {
+                badge.classList.add('status-success');
+                badge.textContent = '✓ Connected';
+            } else if (status === 'error') {
+                badge.classList.add('status-error');
+                badge.textContent = '✗ Failed';
+            } else {
+                badge.classList.add('status-testing');
+                badge.textContent = '⟳ Testing';
+            }
+            msgSpan.textContent = message;
+        }
+        
+        function clearLogs() {
+            document.getElementById('logs').innerHTML = '<div class="log-line info">[System] Logs cleared...</div>';
+            addLog('Logs cleared, ready for new tests', 'info');
+        }
+        
+        function useAlternativeKey() {
+            const altKey = document.getElementById('altKey').value;
+            if (altKey) {
+                addLog(`Using alternative key: ${altKey.substring(0, 20)}...`, 'warning');
+                window.altKeyToUse = altKey;
+            } else {
+                addLog('Please paste an alternative key first', 'warning');
+            }
+        }
+        
+        async function testBasicConnection() {
+            addLog('🔍 Starting basic connection test...', 'info');
+            updateStatus('testing', 'Testing Supabase connection...');
+            
+            try {
+                // Initialize client
+                const keyToUse = window.altKeyToUse || supabaseKey;
+                addLog(`Initializing Supabase client with URL: ${supabaseUrl}`, 'info');
+                addLog(`Using key: ${keyToUse.substring(0, 30)}...`, 'info');
+                
+                supabaseClient = window.supabase.createClient(supabaseUrl, keyToUse);
+                addLog('✅ Supabase client created successfully', 'success');
+                
+                // Test 1: Check if we can access any table
+                addLog('📡 Attempting to query appointments table...', 'info');
+                const { data, error } = await supabaseClient
+                    .from('appointments')
+                    .select('*')
+                    .limit(1);
+                
+                if (error) {
+                    addLog(`❌ Query failed with error: ${error.message}`, 'error');
+                    addLog(`Error code: ${error.code}`, 'error');
+                    addLog(`Error details: ${JSON.stringify(error)}`, 'error');
+                    
+                    // Provide specific troubleshooting
+                    if (error.code === '42P01') {
+                        addLog('⚠️ Table "appointments" does not exist!', 'warning');
+                        addLog('Solution: Create the tables using the SQL provided in Test #4', 'warning');
+                    } else if (error.code === '42501') {
+                        addLog('⚠️ Permission denied - Row Level Security (RLS) is blocking access', 'warning');
+                        addLog('Solution: Disable RLS temporarily or add proper policies', 'warning');
+                    } else if (error.message.includes('JWT')) {
+                        addLog('⚠️ Invalid API key - JWT authentication failed', 'warning');
+                        addLog('Solution: Get the correct anon/public key from Supabase Dashboard → Project Settings → API', 'warning');
+                    }
+                    
+                    updateStatus('error', `Connection failed: ${error.message}`);
+                    return;
+                }
+                
+                addLog(`✅ Success! Connected to Supabase`, 'success');
+                addLog(`📊 Found ${data?.length || 0} records in appointments table`, 'success');
+                updateStatus('success', 'Connected successfully!');
+                
+                // Test 2: Try to get table info
+                await testTableInfo();
+                
+            } catch (error) {
+                addLog(`❌ Fatal error: ${error.message}`, 'error');
+                addLog(`Stack trace: ${error.stack}`, 'error');
+                updateStatus('error', `Error: ${error.message}`);
+            }
+        }
+        
+        async function testTableInfo() {
+            addLog('🔍 Checking available tables...', 'info');
+            
+            const tables = ['appointments', 'treatments', 'patients'];
+            for (const table of tables) {
+                try {
+                    const { error, count } = await supabaseClient
+                        .from(table)
+                        .select('*', { count: 'exact', head: true });
+                    
+                    if (!error) {
+                        addLog(`✅ Table '${table}' exists (${count || 0} records)`, 'success');
+                    } else {
+                        addLog(`❌ Table '${table}' does not exist or inaccessible: ${error.message}`, 'error');
+                    }
+                } catch (e) {
+                    addLog(`⚠️ Could not check table '${table}': ${e.message}`, 'warning');
+                }
+            }
+        }
+        
+        async function testWithDifferentEndpoint() {
+            addLog('🌐 Testing direct REST API access (bypassing Supabase JS client)...', 'info');
+            
+            const keyToUse = window.altKeyToUse || supabaseKey;
+            const endpoint = `${supabaseUrl}/rest/v1/appointments?select=*&limit=1`;
+            
+            addLog(`GET ${endpoint}`, 'info');
+            
+            try {
+                const response = await fetch(endpoint, {
+                    method: 'GET',
+                    headers: {
+                        'apikey': keyToUse,
+                        'Authorization': `Bearer ${keyToUse}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                addLog(`Response status: ${response.status} ${response.statusText}`, 'info');
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    addLog(`✅ REST API working! Response: ${JSON.stringify(data).substring(0, 200)}`, 'success');
+                    updateStatus('success', 'REST API accessible');
+                } else {
+                    const errorText = await response.text();
+                    addLog(`❌ REST API failed: ${response.status} - ${errorText}`, 'error');
+                    
+                    if (response.status === 401) {
+                        addLog('⚠️ Authentication failed - invalid API key', 'warning');
+                        addLog('💡 Go to Supabase Dashboard → Project Settings → API → Copy "anon public" key', 'warning');
+                    } else if (response.status === 404) {
+                        addLog('⚠️ Table not found - need to create tables first', 'warning');
+                    }
+                }
+            } catch (error) {
+                addLog(`❌ Fetch error: ${error.message}`, 'error');
+                addLog('This might be a CORS or network issue', 'error');
+            }
+        }
+        
+        async function checkCORS() {
+            addLog('🔒 Checking CORS configuration...', 'info');
+            addLog('CORS (Cross-Origin Resource Sharing) allows browser to access Supabase', 'info');
+            
+            // Test if we can even reach Supabase
+            try {
+                const response = await fetch(`${supabaseUrl}/rest/v1/`, {
+                    method: 'OPTIONS',
+                    headers: {
+                        'Origin': window.location.origin,
+                        'Access-Control-Request-Method': 'GET'
+                    }
+                });
+                
+                addLog(`OPTIONS request status: ${response.status}`, 'info');
+                
+                const corsHeader = response.headers.get('Access-Control-Allow-Origin');
+                if (corsHeader) {
+                    addLog(`✅ CORS headers present: ${corsHeader}`, 'success');
+                } else {
+                    addLog(`⚠️ No CORS headers detected`, 'warning');
+                    addLog('💡 Solution: In Supabase Dashboard → Settings → API → Add your domain to "Additional allowed origins"', 'warning');
+                    addLog(`   Add this URL: ${window.location.origin}`, 'info');
+                }
+            } catch (error) {
+                addLog(`❌ CORS check failed: ${error.message}`, 'error');
+            }
+            
+            // Provide CORS solution
+            addLog('📝 To fix CORS issues:', 'info');
+            addLog('1. Go to Supabase Dashboard → Authentication → Settings', 'info');
+            addLog('2. Under "Additional redirect URLs", add your site URL', 'info');
+            addLog(`3. Current site URL: ${window.location.origin}`, 'warning');
+        }
+        
+        function createTablesSQL() {
+            addLog('📝 SQL to create required tables - copy and run in Supabase SQL Editor:', 'info');
+            
+            const sql = `
+-- Run this in: https://supabase.com/dashboard/project/cgczzowbxhjpncngmhrb/sql
+
+-- Create appointments table
+CREATE TABLE IF NOT EXISTS appointments (
+    id SERIAL PRIMARY KEY,
+    patient_name VARCHAR(255) NOT NULL,
+    doctor_name VARCHAR(255),
+    date DATE NOT NULL,
+    time TIME,
+    type VARCHAR(100),
+    status VARCHAR(50) DEFAULT 'scheduled',
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Create treatments table
+CREATE TABLE IF NOT EXISTS treatments (
+    id SERIAL PRIMARY KEY,
+    patient_name VARCHAR(255) NOT NULL,
+    patient_id VARCHAR(100),
+    diagnosis TEXT,
+    type VARCHAR(100),
+    doctor_name VARCHAR(255),
+    date DATE NOT NULL,
+    status VARCHAR(50) DEFAULT 'pending',
+    prescription TEXT,
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Create patients table
+CREATE TABLE IF NOT EXISTS patients (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    email VARCHAR(255),
+    phone VARCHAR(50),
+    date_of_birth DATE,
+    address TEXT,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Disable RLS for testing (remove after testing)
+ALTER TABLE appointments DISABLE ROW LEVEL SECURITY;
+ALTER TABLE treatments DISABLE ROW LEVEL SECURITY;
+ALTER TABLE patients DISABLE ROW LEVEL SECURITY;
+
+-- Insert sample data
+INSERT INTO appointments (patient_name, doctor_name, date, time, type, status)
+VALUES ('Test Patient', 'Dr. Smith', CURRENT_DATE, '10:00', 'Checkup', 'scheduled');
+
+INSERT INTO treatments (patient_name, doctor_name, date, type, diagnosis, status)
+VALUES ('Test Patient', 'Dr. Smith', CURRENT_DATE, 'Medication', 'Test Diagnosis', 'pending');
+
+SELECT 'Tables created successfully!' as status;
+`;
+            
+            // Create a textarea with the SQL
+            const sqlDiv = document.createElement('div');
+            sqlDiv.innerHTML = `<pre style="max-height: 400px; overflow: auto;">${sql}</pre>`;
+            document.getElementById('logs').appendChild(sqlDiv);
+            
+            addLog('💡 After running the SQL, click "Test Basic Connection" again', 'warning');
+        }
+        
+        // Add quick diagnostic
+        addLog('💡 Quick diagnostic tips:', 'info');
+        addLog('1. Make sure you are using the CORRECT anon/public key from Supabase Dashboard', 'info');
+        addLog('2. The key should start with "sb_"', 'info');
+        addLog('3. Tables must exist before you can query them', 'info');
+        addLog('4. Check browser console (F12) for more errors', 'info');
+    </script>
+</body>
+</html>

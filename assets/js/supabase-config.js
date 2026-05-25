@@ -2,9 +2,9 @@
 const supabaseUrl = 'https://cgczzowbxhjpncngmhrb.supabase.co';
 const supabaseKey = 'sb_publishable_gEQEaxJLcptRV-IA1Qlq8g_yBdknQwT';
 
-// Initialize Supabase client from CDN library
-const { createClient } = window.supabase;
-const supabaseClient = createClient(supabaseUrl, supabaseKey);
+// Initialize Supabase client
+const supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
 
-// Export for global use
+// Test connection and export
 window.supabaseClient = supabaseClient;
+console.log('Supabase initialized:', supabaseUrl);

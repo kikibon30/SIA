@@ -1,375 +1,458 @@
-/**
- * db-helper.js
- * AppointmentDB — handles all Supabase CRUD operations with
- * localStorage fallback when Supabase is not configured.
- * Emits SIABus events on every mutation for cross-page reactivity.
- */
-
-class AppointmentDB {
-  constructor(client) {
-    this.client = client;
-    this._realtimeChannel = null;
-  }
-
-  /* ─────────────────────────────────────────
-     REAL-TIME SUBSCRIPTIONS
-     ───────────────────────────────────────── */
-  subscribeToAll(onChange) {
-    if (!this.client) return;
-
-    this._realtimeChannel = this.client
-      .channel('sia-realtime')
-      .on('postgres_changes',
-          { event: '*', schema: 'public', table: 'appointments' },
-          (payload) => {
-            onChange({ source: 'appointments', ...payload });
-            SIABus.emit(`appointment:${payload.eventType.toLowerCase()}`, payload.new || payload.old);
-          })
-      .on('postgres_changes',
-          { event: '*', schema: 'public', table: 'treatments' },
-          (payload) => {
-            onChange({ source: 'treatments', ...payload });
-            SIABus.emit(`treatment:${payload.eventType.toLowerCase()}`, payload.new || payload.old);
-          })
-      .on('postgres_changes',
-          { event: '*', schema: 'public', table: 'patients' },
-          (payload) => {
-            onChange({ source: 'patients', ...payload });
-          })
-      .subscribe((status) => {
-        console.log('[Supabase] Realtime status:', status);
-      });
-  }
-
-  unsubscribe() {
-    if (this._realtimeChannel) {
-      this.client.removeChannel(this._realtimeChannel);
-      this._realtimeChannel = null;
-    }
-  }
-
-  /* ─────────────────────────────────────────
-     APPOINTMENTS
-     ───────────────────────────────────────── */
-  async getAppointments(filters = {}) {
-    if (!this.client) return this._localGet('appointments');
-
-    let query = this.client
-      .from('appointments')
-      .select('*')
-      .order('date', { ascending: true })
-      .order('time', { ascending: true });
-
-    if (filters.status)       query = query.eq('status', filters.status);
-    if (filters.doctor_id)    query = query.eq('doctor_id', filters.doctor_id);
-    if (filters.patient_name) query = query.ilike('patient_name', `%${filters.patient_name}%`);
-    if (filters.date_from)    query = query.gte('date', filters.date_from);
-    if (filters.date_to)      query = query.lte('date', filters.date_to);
-
-    const { data, error } = await query;
-    if (error) { console.error('[DB] getAppointments error:', error); return this._localGet('appointments'); }
-    return data || [];
-  }
-
-  async addAppointment(appointment) {
-    const record = this._prepareRecord(appointment);
-
-    if (!this.client) {
-      const saved = this._localAdd('appointments', record);
-      SIABus.emit('appointment:insert', saved);
-      return saved;
+// Database Helper Class for CRUD Operations
+class DatabaseHelper {
+    constructor() {
+        this.supabase = window.supabaseClient;
+        this.tables = {
+            appointments: 'appointments',
+            treatments: 'treatments',
+            patients: 'patients'
+        };
     }
 
-    const { data, error } = await this.client.from('appointments').insert(record).select().single();
-    if (error) { console.error('[DB] addAppointment error:', error); throw error; }
-    SIABus.emit('appointment:insert', data);
-    return data;
-  }
-
-  async updateAppointment(id, updates) {
-    const record = { ...updates, updated_at: new Date().toISOString() };
-    delete record.id;
-    delete record.created_at;
-
-    if (!this.client) {
-      const saved = this._localUpdate('appointments', id, record);
-      SIABus.emit('appointment:update', saved);
-      return saved;
+    // ============ APPOINTMENT CRUD ============
+    
+    async getAppointments(filters = {}) {
+        try {
+            let query = this.supabase
+                .from(this.tables.appointments)
+                .select('*');
+            
+            // Apply filters
+            if (filters.date_from) {
+                query = query.gte('date', filters.date_from);
+            }
+            if (filters.date_to) {
+                query = query.lte('date', filters.date_to);
+            }
+            if (filters.patient_name) {
+                query = query.ilike('patient_name', `%${filters.patient_name}%`);
+            }
+            if (filters.status) {
+                query = query.eq('status', filters.status);
+            }
+            
+            const { data, error } = await query.order('date', { ascending: false });
+            
+            if (error) throw error;
+            return data || [];
+        } catch (error) {
+            console.error('Error getting appointments:', error);
+            return [];
+        }
     }
 
-    const { data, error } = await this.client.from('appointments').update(record).eq('id', id).select().single();
-    if (error) { console.error('[DB] updateAppointment error:', error); throw error; }
-    SIABus.emit('appointment:update', data);
-    return data;
-  }
-
-  async deleteAppointment(id) {
-    if (!this.client) {
-      this._localDelete('appointments', id);
-      SIABus.emit('appointment:delete', { id });
-      return;
+    async createAppointment(appointment) {
+        try {
+            const payload = {
+                patient_name: appointment.patient_name,
+                doctor_name: appointment.doctor_name,
+                date: appointment.date,
+                time: appointment.time,
+                type: appointment.type,
+                status: appointment.status || 'Scheduled'
+            };
+            if (appointment.patient_id) {
+                payload.patient_id = appointment.patient_id;
+            }
+            const { data, error } = await this.supabase
+                .from(this.tables.appointments)
+                .insert([payload])
+                .select();
+            
+            if (error) throw error;
+            return { success: true, data: data[0] };
+        } catch (error) {
+            console.error('Error creating appointment:', error);
+            return { success: false, error: error.message };
+        }
     }
 
-    const { error } = await this.client.from('appointments').delete().eq('id', id);
-    if (error) { console.error('[DB] deleteAppointment error:', error); throw error; }
-    SIABus.emit('appointment:delete', { id });
-  }
-
-  /* ─────────────────────────────────────────
-     TREATMENTS
-     ───────────────────────────────────────── */
-  async getTreatments(filters = {}) {
-    if (!this.client) return this._localGet('treatments');
-
-    let query = this.client
-      .from('treatments')
-      .select('*')
-      .order('date', { ascending: false });
-
-    if (filters.status)       query = query.eq('status', filters.status);
-    if (filters.patient_name) query = query.ilike('patient_name', `%${filters.patient_name}%`);
-    if (filters.doctor_id)    query = query.eq('doctor_id', filters.doctor_id);
-
-    const { data, error } = await query;
-    if (error) { console.error('[DB] getTreatments error:', error); return this._localGet('treatments'); }
-    return data || [];
-  }
-
-  async addTreatment(treatment) {
-    const record = this._prepareRecord(treatment);
-
-    if (!this.client) {
-      const saved = this._localAdd('treatments', record);
-      SIABus.emit('treatment:insert', saved);
-      return saved;
+    async updateAppointment(id, updates) {
+        try {
+            const payload = {
+                patient_name: updates.patient_name,
+                doctor_name: updates.doctor_name,
+                date: updates.date,
+                time: updates.time,
+                type: updates.type,
+                status: updates.status
+            };
+            if (updates.patient_id) {
+                payload.patient_id = updates.patient_id;
+            }
+            const { data, error } = await this.supabase
+                .from(this.tables.appointments)
+                .update(payload)
+                .eq('id', id)
+                .select();
+            
+            if (error) throw error;
+            return { success: true, data: data[0] };
+        } catch (error) {
+            console.error('Error updating appointment:', error);
+            return { success: false, error: error.message };
+        }
     }
 
-    const { data, error } = await this.client.from('treatments').insert(record).select().single();
-    if (error) { console.error('[DB] addTreatment error:', error); throw error; }
-    SIABus.emit('treatment:insert', data);
-    return data;
-  }
-
-  async updateTreatment(id, updates) {
-    const record = { ...updates, updated_at: new Date().toISOString() };
-    delete record.id;
-    delete record.created_at;
-
-    if (!this.client) {
-      const saved = this._localUpdate('treatments', id, record);
-      SIABus.emit('treatment:update', saved);
-      return saved;
+    async deleteAppointment(id) {
+        try {
+            const { error } = await this.supabase
+                .from(this.tables.appointments)
+                .delete()
+                .eq('id', id);
+            
+            if (error) throw error;
+            return { success: true };
+        } catch (error) {
+            console.error('Error deleting appointment:', error);
+            return { success: false, error: error.message };
+        }
     }
 
-    const { data, error } = await this.client.from('treatments').update(record).eq('id', id).select().single();
-    if (error) { console.error('[DB] updateTreatment error:', error); throw error; }
-    SIABus.emit('treatment:update', data);
-    return data;
-  }
-
-  async deleteTreatment(id) {
-    if (!this.client) {
-      this._localDelete('treatments', id);
-      SIABus.emit('treatment:delete', { id });
-      return;
+    // ============ TREATMENT CRUD ============
+    
+    async getTreatments(filters = {}) {
+        try {
+            let query = this.supabase
+                .from(this.tables.treatments)
+                .select('*');
+            
+            if (filters.patient_name) {
+                query = query.ilike('patient_name', `%${filters.patient_name}%`);
+            }
+            if (filters.status) {
+                query = query.eq('status', filters.status);
+            }
+            
+            const { data, error } = await query.order('date', { ascending: false });
+            
+            if (error) throw error;
+            return data || [];
+        } catch (error) {
+            console.error('Error getting treatments:', error);
+            return [];
+        }
     }
 
-    const { error } = await this.client.from('treatments').delete().eq('id', id);
-    if (error) { console.error('[DB] deleteTreatment error:', error); throw error; }
-    SIABus.emit('treatment:delete', { id });
-  }
+    async createTreatment(treatment) {
+        try {
+            const initialPayload = {
+                patient_name: treatment.patient_name,
+                patient_id: treatment.patient_id || null,
+                diagnosis: treatment.diagnosis,
+                type: treatment.type,
+                description: treatment.description || '',
+                procedure: treatment.procedure || '',
+                doctor_name: treatment.doctor_name || '',
+                date: treatment.date,
+                status: treatment.status || 'Pending',
+                notes: treatment.notes || ''
+            };
 
-  /* ─────────────────────────────────────────
-     PATIENTS
-     ───────────────────────────────────────── */
-  async getPatients() {
-    if (!this.client) return this._localGet('patients');
+            let payload = { ...initialPayload };
+            while (true) {
+                const { data, error } = await this.supabase
+                    .from(this.tables.treatments)
+                    .insert([payload])
+                    .select();
 
-    const { data, error } = await this.client
-      .from('patients')
-      .select('*')
-      .order('name', { ascending: true });
+                if (!error) return { success: true, data: data[0] };
 
-    if (error) { console.error('[DB] getPatients error:', error); return this._localGet('patients'); }
-    return data || [];
-  }
+                const msg = (error.message || '').toString();
+                const m = msg.match(/Could not find the '(.+?)' column/i) || msg.match(/column "(.+?)" does not exist/i);
+                if (m && m[1]) {
+                    const col = m[1];
+                    if (col in payload) {
+                        delete payload[col];
+                        const keys = Object.keys(payload).filter(k => payload[k] !== undefined);
+                        if (!keys.length) break;
+                        continue;
+                    }
+                }
 
-  async addPatient(patient) {
-    const record = this._prepareRecord(patient);
-    if (!this.client) return this._localAdd('patients', record);
-
-    const { data, error } = await this.client.from('patients').insert(record).select().single();
-    if (error) { console.error('[DB] addPatient error:', error); throw error; }
-    return data;
-  }
-
-  /* ─────────────────────────────────────────
-     DOCTORS / STAFF
-     ───────────────────────────────────────── */
-  async getDoctors() {
-    if (!this.client) return this._getDefaultDoctors();
-
-    const { data, error } = await this.client
-      .from('staff')
-      .select('*')
-      .eq('role', 'Doctor')
-      .order('name', { ascending: true });
-
-    if (error || !data?.length) return this._getDefaultDoctors();
-    return data;
-  }
-
-  async getNurses() {
-    if (!this.client) return this._getDefaultNurses();
-
-    const { data, error } = await this.client
-      .from('staff')
-      .select('*')
-      .eq('role', 'Nurse')
-      .order('name', { ascending: true });
-
-    if (error || !data?.length) return this._getDefaultNurses();
-    return data;
-  }
-
-  /* ─────────────────────────────────────────
-     STAFF ASSIGNMENTS
-     ───────────────────────────────────────── */
-  async getAssignments(treatmentId) {
-    if (!this.client) return this._localGet('assignments').filter(a => a.treatment_id === treatmentId);
-
-    const { data, error } = await this.client
-      .from('staff_assignments')
-      .select('*')
-      .eq('treatment_id', treatmentId);
-
-    if (error) return [];
-    return data || [];
-  }
-
-  async saveAssignment(assignment) {
-    const record = this._prepareRecord(assignment);
-    if (!this.client) return this._localAdd('assignments', record);
-
-    const { data, error } = await this.client.from('staff_assignments').upsert(record).select().single();
-    if (error) throw error;
-    return data;
-  }
-
-  /* ─────────────────────────────────────────
-     DASHBOARD STATS
-     ───────────────────────────────────────── */
-  async getStats() {
-    try {
-      const [appointments, treatments] = await Promise.all([
-        this.getAppointments(),
-        this.getTreatments()
-      ]);
-
-      const today = new Date().toISOString().split('T')[0];
-      const upcoming = appointments.filter(a =>
-        a.date >= today && ['Scheduled', 'Confirmed', 'Pending'].includes(a.status)
-      );
-
-      return {
-        totalAppointments:    appointments.length,
-        upcomingAppointments: upcoming.length,
-        totalTreatments:      treatments.length,
-        completedTreatments:  treatments.filter(t => t.status === 'Completed').length,
-        scheduledToday:       appointments.filter(a => a.date === today).length,
-        pendingTreatments:    treatments.filter(t => t.status === 'Ongoing').length,
-      };
-    } catch (err) {
-      console.error('[DB] getStats error:', err);
-      return { totalAppointments: 0, upcomingAppointments: 0, totalTreatments: 0, completedTreatments: 0 };
+                throw error;
+            }
+            return { success: false, error: 'Failed to save treatment: no valid columns to insert' };
+        } catch (error) {
+            console.error('Error creating treatment:', error);
+            return { success: false, error: error.message };
+        }
     }
-  }
 
-  /* ─────────────────────────────────────────
-     EXPORT HELPERS
-     ───────────────────────────────────────── */
-  async exportToJSON(table) {
-    const data = await this[`get${table.charAt(0).toUpperCase() + table.slice(1)}`]();
-    return JSON.stringify(data, null, 2);
-  }
+    async updateTreatment(id, updates) {
+        try {
+            const initialPayload = {
+                patient_name: updates.patient_name,
+                patient_id: updates.patient_id,
+                diagnosis: updates.diagnosis,
+                type: updates.type,
+                description: updates.description,
+                procedure: updates.procedure,
+                doctor_name: updates.doctor_name,
+                date: updates.date,
+                status: updates.status,
+                notes: updates.notes
+            };
 
-  async exportToCSV(table) {
-    const data = await this[`get${table.charAt(0).toUpperCase() + table.slice(1)}`]();
-    if (!data.length) return '';
-    const headers = Object.keys(data[0]);
-    const rows = data.map(row =>
-      headers.map(h => `"${String(row[h] ?? '').replace(/"/g, '""')}"`).join(',')
-    );
-    return [headers.join(','), ...rows].join('\n');
-  }
+            let payload = { ...initialPayload };
+            while (true) {
+                const { data, error } = await this.supabase
+                    .from(this.tables.treatments)
+                    .update(payload)
+                    .eq('id', id)
+                    .select();
 
-  /* ─────────────────────────────────────────
-     PRIVATE — localStorage helpers
-     ───────────────────────────────────────── */
-  _prepareRecord(record) {
-    return {
-      ...record,
-      id: record.id || this._generateId(),
-      created_at: record.created_at || new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
-  }
+                if (!error) return { success: true, data: data[0] };
 
-  _generateId() {
-    return `local_${Date.now()}_${Math.random().toString(36).substr(2, 8)}`;
-  }
+                const msg = (error.message || '').toString();
+                const m = msg.match(/Could not find the '(.+?)' column/i) || msg.match(/column "(.+?)" does not exist/i);
+                if (m && m[1]) {
+                    const col = m[1];
+                    if (col in payload) {
+                        delete payload[col];
+                        const keys = Object.keys(payload).filter(k => payload[k] !== undefined);
+                        if (!keys.length) break;
+                        continue;
+                    }
+                }
 
-  _localGet(key) {
-    try { return JSON.parse(localStorage.getItem(key) || '[]'); }
-    catch { return []; }
-  }
-
-  _localAdd(key, record) {
-    const arr = this._localGet(key);
-    arr.push(record);
-    localStorage.setItem(key, JSON.stringify(arr));
-    return record;
-  }
-
-  _localUpdate(key, id, updates) {
-    const arr = this._localGet(key);
-    const idx = arr.findIndex(r => r.id === id);
-    if (idx > -1) {
-      arr[idx] = { ...arr[idx], ...updates };
-      localStorage.setItem(key, JSON.stringify(arr));
-      return arr[idx];
+                throw error;
+            }
+            return { success: false, error: 'Failed to update treatment: no valid columns to update' };
+        } catch (error) {
+            console.error('Error updating treatment:', error);
+            return { success: false, error: error.message };
+        }
     }
-    return null;
-  }
 
-  _localDelete(key, id) {
-    const arr = this._localGet(key).filter(r => r.id !== id);
-    localStorage.setItem(key, JSON.stringify(arr));
-  }
+    async deleteTreatment(id) {
+        try {
+            const { error } = await this.supabase
+                .from(this.tables.treatments)
+                .delete()
+                .eq('id', id);
+            
+            if (error) throw error;
+            return { success: true };
+        } catch (error) {
+            console.error('Error deleting treatment:', error);
+            return { success: false, error: error.message };
+        }
+    }
 
-  _getDefaultDoctors() {
-    return [
-      { id: 1, name: 'Dr. Sarah Chen',      role: 'Doctor', specialty: 'General Medicine',  contact: 'sarah.chen@medcenter.com' },
-      { id: 2, name: 'Dr. Michael Johnson', role: 'Doctor', specialty: 'Cardiology',        contact: 'michael.j@medcenter.com'  },
-      { id: 3, name: 'Dr. Emily Roberts',   role: 'Doctor', specialty: 'Pediatrics',        contact: 'emily.r@medcenter.com'    },
-      { id: 4, name: 'Dr. James Torres',    role: 'Doctor', specialty: 'Orthopedics',       contact: 'james.t@medcenter.com'    },
-      { id: 5, name: 'Dr. Anna Kim',        role: 'Doctor', specialty: 'Dermatology',       contact: 'anna.k@medcenter.com'     },
-    ];
-  }
+    // ============ PATIENTS CRUD ============
 
-  _getDefaultNurses() {
-    return [
-      { id: 10, name: 'Nurse Maria Santos', role: 'Nurse', contact: 'maria.s@medcenter.com'   },
-      { id: 11, name: 'Nurse John Reyes',   role: 'Nurse', contact: 'john.r@medcenter.com'    },
-      { id: 12, name: 'Nurse Lisa Park',    role: 'Nurse', contact: 'lisa.p@medcenter.com'    },
-    ];
-  }
+    async getPatients(filters = {}) {
+        try {
+            let query = this.supabase
+                .from(this.tables.patients)
+                .select('*');
+
+            if (filters.full_name) {
+                query = query.ilike('full_name', `%${filters.full_name}%`);
+            }
+            if (filters.patient_code) {
+                query = query.ilike('patient_code', `%${filters.patient_code}%`);
+            }
+            if (filters.status) {
+                query = query.eq('status', filters.status);
+            }
+
+            const { data, error } = await query.order('created_at', { ascending: false });
+            if (error) throw error;
+            return data || [];
+        } catch (error) {
+            console.error('Error getting patients:', error);
+            return [];
+        }
+    }
+
+    async createPatient(patient) {
+        try {
+            // Build initial payload from incoming patient object
+            const initialPayload = {
+                full_name: patient.full_name,
+                name: patient.full_name,
+                patient_code: patient.patient_code,
+                dob: patient.dob || null,
+                gender: patient.gender || null,
+                phone: patient.phone || null,
+                email: patient.email || null,
+                address: patient.address || null,
+                status: patient.status || 'Active'
+            };
+
+            // Attempt insert, and if Supabase complains about unknown columns,
+            // strip the offending column and retry until success or no columns left.
+            let payload = { ...initialPayload };
+            while (true) {
+                const { data, error } = await this.supabase
+                    .from(this.tables.patients)
+                    .insert([payload])
+                    .select();
+
+                if (!error) return { success: true, data: data[0] };
+
+                // If error message indicates a missing column, remove it and retry
+                const msg = (error.message || '').toString();
+                const m = msg.match(/Could not find the '(.+?)' column/i) || msg.match(/column "(.+?)" does not exist/i);
+                if (m && m[1]) {
+                    const col = m[1];
+                    if (col in payload) {
+                        delete payload[col];
+                        // If payload has only primary key left, stop retrying
+                        const keys = Object.keys(payload).filter(k => payload[k] !== undefined);
+                        if (!keys.length) break;
+                        continue; // retry
+                    }
+                }
+
+                // Unknown error or couldn't resolve column — bubble up
+                throw error;
+            }
+            return { success: false, error: 'Failed to save patient: no valid columns to insert' };
+        } catch (error) {
+            console.error('Error creating patient:', error);
+            return { success: false, error: error.message };
+        }
+    }
+
+    async updatePatient(id, updates) {
+        try {
+            const initialPayload = {
+                full_name: updates.full_name,
+                name: updates.full_name,
+                patient_code: updates.patient_code,
+                dob: updates.dob || null,
+                gender: updates.gender || null,
+                phone: updates.phone || null,
+                email: updates.email || null,
+                address: updates.address || null,
+                status: updates.status || 'Active'
+            };
+
+            let payload = { ...initialPayload };
+            while (true) {
+                const { data, error } = await this.supabase
+                    .from(this.tables.patients)
+                    .update(payload)
+                    .eq('id', id)
+                    .select();
+
+                if (!error) return { success: true, data: data[0] };
+
+                const msg = (error.message || '').toString();
+                const m = msg.match(/Could not find the '(.+?)' column/i) || msg.match(/column "(.+?)" does not exist/i);
+                if (m && m[1]) {
+                    const col = m[1];
+                    if (col in payload) {
+                        delete payload[col];
+                        const keys = Object.keys(payload).filter(k => payload[k] !== undefined);
+                        if (!keys.length) break;
+                        continue;
+                    }
+                }
+
+                throw error;
+            }
+            return { success: false, error: 'Failed to update patient: no valid columns to update' };
+        } catch (error) {
+            console.error('Error updating patient:', error);
+            return { success: false, error: error.message };
+        }
+    }
+
+    async deletePatient(id) {
+        try {
+            const { error } = await this.supabase
+                .from(this.tables.patients)
+                .delete()
+                .eq('id', id);
+
+            if (error) throw error;
+            return { success: true };
+        } catch (error) {
+            console.error('Error deleting patient:', error);
+            return { success: false, error: error.message };
+        }
+    }
+
+    // ============ STATS & DASHBOARD ============
+    
+    async getStats() {
+        try {
+            const appointments = await this.getAppointments();
+            const treatments = await this.getTreatments();
+            const today = new Date().toISOString().split('T')[0];
+            
+            const scheduledToday = appointments.filter(a => 
+                a.date === today && a.status.toLowerCase() !== 'cancelled'
+            ).length;
+            
+            const upcoming = appointments.filter(a => 
+                a.date >= today && a.status.toLowerCase() === 'scheduled'
+            ).length;
+            
+            const completedTreatments = treatments.filter(t => 
+                t.status.toLowerCase() === 'completed'
+            ).length;
+            
+            const pendingTreatments = treatments.filter(t => 
+                t.status.toLowerCase() === 'pending'
+            ).length;
+            
+            return {
+                totalAppointments: appointments.length,
+                upcomingAppointments: upcoming,
+                totalTreatments: treatments.length,
+                completedTreatments: completedTreatments,
+                scheduledToday: scheduledToday,
+                pendingTreatments: pendingTreatments
+            };
+        } catch (error) {
+            console.error('Error getting stats:', error);
+            return {
+                totalAppointments: 0,
+                upcomingAppointments: 0,
+                totalTreatments: 0,
+                completedTreatments: 0,
+                scheduledToday: 0,
+                pendingTreatments: 0
+            };
+        }
+    }
+
+    // Real-time subscription
+    subscribeToChanges(table, callback) {
+        const subscription = this.supabase
+            .channel(`${table}-changes`)
+            .on('postgres_changes', 
+                { event: '*', schema: 'public', table: table },
+                (payload) => {
+                    console.log(`${table} changed:`, payload);
+                    callback(payload);
+                }
+            )
+            .subscribe();
+        
+        return subscription;
+    }
+
+    // Test database connection
+    async testConnection() {
+        try {
+            const { data, error } = await this.supabase
+                .from(this.tables.appointments)
+                .select('count', { count: 'exact', head: true });
+            
+            if (error) throw error;
+            return { success: true, message: 'Connected to Supabase!' };
+        } catch (error) {
+            console.error('Connection test failed:', error);
+            return { success: false, message: error.message };
+        }
+    }
 }
 
-/* ─────────────────────────────────────────
-   Global DB factory — call initDB() on each page
-   ───────────────────────────────────────── */
-function initDB() {
-  const client = window._supabaseReady ? window.supabaseClient : null;
-  return new AppointmentDB(client);
-}
+// Initialize and export
+window.db = new DatabaseHelper();
